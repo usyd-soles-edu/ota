@@ -18,5 +18,6 @@ RoxygenNote: 7.3.3
 Imports: readxl,
     dplyr,
     tidyr,
-    stringr
+    stringr,
+    readr
 Suggests: testthat
