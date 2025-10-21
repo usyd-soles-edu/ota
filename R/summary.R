@@ -314,7 +314,7 @@ generate_html_summary <- function(all_changes,
     "</head>",
     "<body>",
     "<div class=\"container\">",
-    sprintf("<h1>Roster Changes Summary - %s</h1>", unit),
+    sprintf("<h1>Roster Changes Summary - %s</h1>", toupper(unit)),
     "<div class=\"summary-stats\">",
     "<div class=\"stats-row\">"
   )
@@ -386,7 +386,7 @@ generate_html_summary <- function(all_changes,
     sprintf(
       "<div class=\"footer\">Generated: %s | Unit: %s</div>",
       format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-      unit
+      toupper(unit)
     ),
     "</div>",
     "</body>",
