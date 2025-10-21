@@ -37,49 +37,29 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   else
     nrow(paycode_changes)
 
-  # Function to format activity
+  # Function to format activity (shared with HTML generation)
   format_activity <- function(row) {
     week_str <- sprintf("Wk%d", row$week)
     day_abbr <- substr(row$day, 1, 3)  # Mon, Tue, etc.
-
-    # Convert times to 12-hour format
-    convert_time <- function(time_str) {
-      hour <- as.integer(substr(time_str, 1, 2))
-      if (hour == 0)
-        "12am"
-      else if (hour < 12)
-        paste0(hour, "am")
-      else if (hour == 12)
-        "12pm"
-      else
-        paste0(hour - 12, "pm")
-    }
-
-    start_conv <- convert_time(row$start)
-    end_conv <- convert_time(row$end)
-
-    sprintf("%s - Lab %s %s %s-%s",
-            week_str,
-            row$location,
-            day_abbr,
-            start_conv,
-            end_conv)
+    start_conv <- convert_time_12h(row$start)
+    end_conv <- convert_time_12h(row$end)
+    sprintf("%s - Lab %s %s %s-%s", week_str, row$location, day_abbr, start_conv, end_conv)
   }
 
   # Collect all changes into one data frame
   change_list <- list(
     additions %>% dplyr::mutate(
       type = "Addition",
-      details = sprintf("%s (%s)", cli::style_bold(cli::col_green(name)), role)
+      details = sprintf("%s - %s", cli::style_bold(cli::col_green(name)), role)
     ),
     removals %>% dplyr::mutate(
       type = "Removal",
-      details = sprintf("%s (%s)", cli::style_bold(cli::col_red(name)), role)
+      details = sprintf("%s - %s", cli::style_bold(cli::col_red(name)), role)
     ),
     replacements %>% dplyr::mutate(
       type = "Replacement",
       details = sprintf(
-        "%s → %s (%s)",
+        "%s → %s - %s",
         cli::style_strikethrough(cli::col_red(name_removed)),
         cli::style_bold(cli::col_green(name_added)),
         role
@@ -93,7 +73,7 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       dplyr::mutate(
         type = "Paycode change",
         details = sprintf(
-          "%s (%s → %s)",
+          "%s - %s → %s",
           cli::style_bold(cli::col_green(name)),
           cli::style_strikethrough(cli::col_red(role_prev)),
           cli::style_bold(cli::col_green(role_latest))
@@ -251,7 +231,7 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   invisible(df)
 }
 
-# Helper function to generate HTML
+# Helper function to generate HTML with table only
 generate_html_summary <- function(all_changes,
                                   unit,
                                   total_changes,
@@ -260,144 +240,56 @@ generate_html_summary <- function(all_changes,
                                   n_replacements,
                                   n_paycode_changes,
                                   file_path = NULL) {
-  # Create timestamp
   timestamp <- format(Sys.time(), "%Y-%m-%d-%H%M%S")
-
-  # Determine output directory
-  if (!is.null(file_path) && file_path != "") {
-    # Use same directory as source file
-    output_dir <- dirname(file_path)
-  } else {
-    # Fallback to logs/html
-    output_dir <- "logs/html"
-  }
+  output_dir <- if (!is.null(file_path) && file_path != "") dirname(file_path) else "logs/html"
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
-  if (!dir.exists(output_dir)) {
-    dir.create(output_dir, recursive = TRUE)
-  }
-
   filename <- sprintf("%s-changes-%s.html", unit, timestamp)
   filepath <- file.path(output_dir, filename)
 
-  # Start HTML document with basic styling
-  html_parts <- c(
-    "<!DOCTYPE html>",
-    "<html>",
-    "<head>",
-    "<meta charset=\"UTF-8\">",
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
-    "<title>Roster Changes Summary</title>",
-    "<style>",
-    "  body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background-color: #ffffff; }",
-    "  .container { max-width: 900px; margin: 0 auto; }",
-    "  h1 { font-size: 22px; color: #333333; margin: 0 0 16px 0; }",
-    "  .summary-stats { margin-bottom: 24px; }",
-    "  .stats-row { display: flex; gap: 24px; flex-wrap: wrap; }",
-    "  .stat-item { min-width: 120px; }",
-    "  .stat-label { font-size: 12px; color: #666666; text-transform: uppercase; font-weight: bold; }",
-    "  .stat-value { font-size: 24px; font-weight: bold; color: #333333; margin-top: 4px; }",
-    "  .stat-additions { color: #16a34a; }",
-    "  .stat-removals { color: #ef4444; }",
-    "  .stat-replacements { color: #f59e0b; }",
-    "  .stat-paycode { color: #3b82f6; }",
-    "  table { width: 100%; border-collapse: collapse; margin-top: 0; }",
-    "  th { text-align: left; font-size: 12px; font-weight: bold; color: #ffffff; background-color: #333333; padding: 10px; border: 1px solid #333333; }",
-    "  td { padding: 10px; border: 1px solid #dddddd; font-size: 13px; }",
-    "  tr:nth-child(even) { background-color: #f9f9f9; }",
-    "  .text-success { color: #16a34a; font-weight: bold; }",
-    "  .text-danger { color: #ef4444; font-weight: bold; }",
-    "  .text-warning { color: #f59e0b; font-weight: bold; }",
-    "  .text-info { color: #3b82f6; font-weight: bold; }",
-    "  .strikethrough { text-decoration: line-through; }",
-    "  .footer { font-size: 11px; color: #999999; margin-top: 20px; padding-top: 12px; border-top: 1px solid #dddddd; }",
-    "</style>",
-    "</head>",
-    "<body>",
-    "<div class=\"container\">",
-    sprintf("<h1>Roster Changes Summary - %s</h1>", toupper(unit)),
-    "<div class=\"summary-stats\">",
-    "<div class=\"stats-row\">"
-  )
-
-  # Add summary statistics
-  html_parts <- c(
-    html_parts,
-    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Total Changes</div><div class=\"stat-value\">%d</div></div>", total_changes),
-    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Additions</div><div class=\"stat-value stat-additions\">%d</div></div>", n_additions),
-    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Removals</div><div class=\"stat-value stat-removals\">%d</div></div>", n_removals),
-    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Replacements</div><div class=\"stat-value stat-replacements\">%d</div></div>", n_replacements),
-    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Paycode Changes</div><div class=\"stat-value stat-paycode\">%d</div></div>", n_paycode_changes),
-    "</div>",
-    "</div>",
-    "<table>",
-    "<thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Activity</th></tr></thead>",
-    "<tbody>"
-  )
-
-  # Add table rows
+  # Build table rows
+  table_rows <- c("<tbody>")
   for (i in seq_len(nrow(all_changes))) {
     row <- all_changes[i, ]
     date_str <- format(row$date, "%Y-%m-%d")
-
-    # Format activity
     week_str <- sprintf("Wk%d", row$week)
     day_abbr <- substr(row$day, 1, 3)
-    convert_time <- function(time_str) {
-      hour <- as.integer(substr(time_str, 1, 2))
-      if (hour == 0)
-        "12am"
-      else if (hour < 12)
-        paste0(hour, "am")
-      else if (hour == 12)
-        "12pm"
-      else
-        paste0(hour - 12, "pm")
-    }
-    start_conv <- convert_time(row$start)
-    end_conv <- convert_time(row$end)
-    activity <- sprintf("%s - Lab %s %s %s-%s",
-                        week_str,
-                        row$location,
-                        day_abbr,
-                        start_conv,
-                        end_conv)
-
-    # Determine type badge class
-    
-    # Format details with HTML styling
+    start_conv <- convert_time_12h(row$start)
+    end_conv <- convert_time_12h(row$end)
+    activity <- sprintf("%s - Lab %s %s %s-%s", week_str, row$location, day_abbr, start_conv, end_conv)
     details_html <- format_details_html(row$type, row$details)
-
-    html_row <- sprintf(
+    
+    table_rows <- c(table_rows, sprintf(
       "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-      date_str,
-      row$type,
-      details_html,
-      activity
-    )
-
-    html_parts <- c(html_parts, html_row)
+      date_str, row$type, details_html, activity
+    ))
   }
+  table_rows <- c(table_rows, "</tbody>")
 
-  # Close HTML document
-  html_parts <- c(
-    html_parts,
-    "</tbody>",
+  # Simple HTML with table only
+  html <- c(
+    "<!DOCTYPE html>",
+    "<html><head><meta charset=\"UTF-8\">",
+    "<style>",
+    "table { border-collapse: collapse; width: 100%; }",
+    "th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }",
+    "th { background: #333; color: #fff; }",
+    "tr:nth-child(even) { background: #f9f9f9; }",
+    ".text-success { color: #16a34a; font-weight: bold; }",
+    ".text-danger { color: #ef4444; font-weight: bold; }",
+    ".text-info { color: #3b82f6; font-weight: bold; }",
+    ".strikethrough { text-decoration: line-through; }",
+    "</style>",
+    "</head><body>",
+    "<table>",
+    "<thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Activity</th></tr></thead>",
+    table_rows,
     "</table>",
-    sprintf(
-      "<div class=\"footer\">Generated: %s | Unit: %s</div>",
-      format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-      toupper(unit)
-    ),
-    "</div>",
-    "</body>",
-    "</html>"
+    "</body></html>"
   )
 
-  # Write HTML file
-  writeLines(html_parts, filepath)
-
-  # Return full file path
-  return(filepath)
+  writeLines(html, filepath)
+  filepath
 }
 
 # Helper function to format details text with HTML styling
@@ -406,15 +298,15 @@ format_details_html <- function(type, details_text) {
   clean_text <- cli::ansi_strip(details_text)
   
   if (type == "Addition") {
-    # Format: Name (Role) - green and bold
+    # Format: Name - Role
     return(sprintf("<span class=\"text-success\">%s</span>", clean_text))
   } else if (type == "Removal") {
-    # Format: Name (Role) - red and bold
+    # Format: Name - Role
     return(sprintf("<span class=\"text-danger\">%s</span>", clean_text))
   } else if (type == "Replacement") {
-    # Format: OldName → NewName (Role)
+    # Format: OldName → NewName - Role
     # Use regex to split on arrow and extract components
-    arrow_pattern <- "^(.+?) → (.+?) \\((.+)\\)$"
+    arrow_pattern <- "^(.+?) → (.+?) - (.+)$"
     
     if (grepl(arrow_pattern, clean_text)) {
       old_name <- sub(arrow_pattern, "\\1", clean_text)
@@ -422,17 +314,38 @@ format_details_html <- function(type, details_text) {
       role <- sub(arrow_pattern, "\\3", clean_text)
       
       return(sprintf(
-        "<span class=\"strikethrough text-danger\">%s</span> → <span class=\"text-success\">%s</span> <span style=\"color: #666666;\">(%s)</span>",
+        "<span class=\"strikethrough text-danger\">%s</span> → <span class=\"text-success\">%s</span> - %s",
         old_name, new_name, role
       ))
     }
     return(sprintf("<span class=\"text-warning\">%s</span>", clean_text))
   } else if (type == "Paycode change") {
-    # Format: Name (Role1 → Role2) - colored
+    # Format: Name - OldRole → NewRole - all in blue with strikethrough on old role
+    paycode_pattern <- "^(.+?) - (.+?) → (.+)$"
+    
+    if (grepl(paycode_pattern, clean_text)) {
+      name <- sub(paycode_pattern, "\\1", clean_text)
+      old_role <- sub(paycode_pattern, "\\2", clean_text)
+      new_role <- sub(paycode_pattern, "\\3", clean_text)
+      
+      return(sprintf(
+        "<span class=\"text-info\">%s - <span class=\"strikethrough\">%s</span> → %s</span>",
+        name, old_role, new_role
+      ))
+    }
     return(sprintf("<span class=\"text-info\">%s</span>", clean_text))
   }
   
   return(clean_text)
+}
+
+# Utility: Convert 24h time to 12h format
+convert_time_12h <- function(time_str) {
+  hour <- as.integer(substr(time_str, 1, 2))
+  if (hour == 0) "12am"
+  else if (hour < 12) paste0(hour, "am")
+  else if (hour == 12) "12pm"
+  else paste0(hour - 12, "pm")
 }
 
 # Suppress R CMD check notes for non-standard evaluation variables

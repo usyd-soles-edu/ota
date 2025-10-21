@@ -9,7 +9,7 @@ roster(file_path, unit)
 \arguments{
 \item{file_path}{Path to the Excel file containing the roster data.}
 
-\item{unit}{The unit identifier (e.g., "biol1007", "biol2022"). Required.}
+\item{unit}{The unit identifier (e.g., "BIOL1007", "BIOL2022", case-insensitive). Required.}
 }
 \value{
 A dataframe in long format with roster assignments.
