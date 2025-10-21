@@ -4,6 +4,7 @@
 #' names with paycode rules from an external stafflist. It validates that all 
 #' roster staff are accounted for in the stafflist and applies paycode rules 
 #' based on staff attributes (PhD status, role, and whether they're a new staff member).
+#' The function also updates the latest snapshot CSV file to include the paycode column.
 #'
 #' @param df A dataframe with roster data, typically returned by \code{\link{snapshot}()}.
 #'   Must have columns: name, role. Must have attributes \code{file_path} and \code{unit} set.
@@ -31,10 +32,9 @@
 #' they are highlighted in the console output with a warning message so the user
 #' can update the stafflist accordingly.
 #'
-#' The function also stores information about paycode changes (for tracking in \code{\link{compare}()})
-#' if staff had their TUX rates modified due to changes in their tutorial schedule 
-#' (e.g., dropping their first tutorial changes the next tutor slot from 
-#' "Tutor (repeat)" to "Tutor").
+#' The latest snapshot CSV file in the logs directory is automatically updated
+#' to include the new paycode column, allowing downstream functions like 
+#' \code{\link{compare}()} to track paycode changes when processing future snapshots.
 #'
 #' @return The input dataframe with a new \code{paycode} column added, invisibly.
 #'   The dataframe retains its original attributes (file_path, unit).
@@ -60,7 +60,7 @@
 #' @importFrom readxl read_excel
 #' @importFrom dplyr left_join mutate case_when filter pull select distinct arrange
 #' @importFrom tidyr replace_na
-#' @importFrom cli style_bold col_red cat_line
+#' @importFrom cli style_bold col_red col_green cat_line
 #' @importFrom rlang .data
 #' @export
 add_paycodes <- function(df) {
@@ -140,6 +140,23 @@ add_paycodes <- function(df) {
       )
     ) %>%
     dplyr::select(-Phd)  # Remove the temporary Phd column
+  
+  # Rewrite the latest snapshot CSV file with paycode column included
+  logs_dir <- file.path(dirname(file_path), "logs")
+  log_files <- list.files(logs_dir, pattern = paste0(unit, "-.*\\.csv$"), full.names = TRUE)
+  
+  if (length(log_files) > 0) {
+    # Get the most recent log file
+    latest_log <- sort(log_files)[length(log_files)]
+    
+    # Arrange by name, date, start for consistency
+    df_to_save <- df_with_paycode %>% dplyr::arrange(name, date, start)
+    
+    # Overwrite the latest log file with paycode column
+    write.csv(df_to_save, latest_log, row.names = FALSE)
+    
+    cli::cat_line(cli::col_green(paste0("✓ Updated snapshot with paycode column: ", latest_log)))
+  }
   
   # Restore attributes and return invisibly
   attr(df_with_paycode, "file_path") <- file_path

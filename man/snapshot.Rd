@@ -4,11 +4,15 @@
 \alias{snapshot}
 \title{Create a Timestamped Snapshot of the Roster}
 \usage{
-snapshot(df)
+snapshot(df, force = FALSE)
 }
 \arguments{
 \item{df}{A dataframe with roster data, typically returned by \code{\link{roster}()}.
 Must have attributes \code{file_path} and \code{unit} set.}
+
+\item{force}{Logical. If \code{FALSE} (default), only saves a snapshot if the 
+current roster differs from the latest snapshot. If \code{TRUE}, always saves 
+a new snapshot regardless of changes.}
 }
 \value{
 Invisibly returns the input dataframe, allowing for function chaining.
@@ -16,8 +20,8 @@ Invisibly returns the input dataframe, allowing for function chaining.
 \description{
 Saves the current roster to a timestamped CSV file in the logs directory.
 This function is used to record roster states over time for comparison and
-change tracking. Snapshots are only saved if there are differences from
-the latest existing snapshot.
+change tracking. By default, snapshots are only saved if there are differences 
+from the latest existing snapshot.
 }
 \details{
 The function creates a \code{logs} subdirectory in the same directory as
@@ -28,14 +32,18 @@ Before saving, the function applies \code{\link{mutate_tutor_roles}()} to
 mark the first tutor role per person-week as "Tutor" and subsequent tutor
 roles in the same week as "Tutor (repeat)".
 
-If the current roster is identical to the latest snapshot, no new snapshot
-is created and a message is displayed.
+If the current roster is identical to the latest snapshot and \code{force = FALSE},
+no new snapshot is created and a message is displayed. When \code{force = TRUE},
+a snapshot is always created even if no changes are detected.
 }
 \examples{
 \dontrun{
-# Load roster and create snapshot
+# Load roster and create snapshot (only if changed)
 df <- roster("path/to/roster.xlsx", unit = "biol1007")
 snapshot(df)
+
+# Force snapshot creation regardless of changes
+snapshot(df, force = TRUE)
 }
 
 }

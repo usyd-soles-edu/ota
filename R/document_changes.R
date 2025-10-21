@@ -2,12 +2,13 @@
 #' @description 
 #' This function takes the result from a comparison and prints a formatted,
 #' color-coded summary of changes including additions (in green), removals 
-#' (in red), and replacements (showing old crossed-out and new in green).
-#' The output is organized by date with a formatted table layout and includes
-#' helpful emoji indicators (🟢 for additions, 🔴 for removals, 🔄 for replacements).
+#' (in red), replacements (showing old crossed-out and new in green), and
+#' paycode changes (showing role transitions). The output is organized by date 
+#' with a formatted table layout and includes helpful emoji indicators.
 #' 
 #' @param compare_result A list returned by \code{\link{compare}()}, containing
-#'   changes (a list of additions, removals, and replacements) and the original dataframe.
+#'   changes (a list of additions, removals, replacements, and paycode_changes) 
+#'   and the original dataframe.
 #' 
 #' @return Invisibly returns the original dataframe, allowing for function chaining.
 #' 
@@ -15,8 +16,8 @@
 #' The function displays changes in a formatted table with the following columns:
 #' \itemize{
 #'   \item{Date}{The date of the roster change}
-#'   \item{Type}{The type of change (Addition, Removal, or Replacement)}
-#'   \item{Details}{Person name(s) and role with emoji indicator, with color coding}
+#'   \item{Type}{The type of change (Addition, Removal, Replacement, or Paycode change)}
+#'   \item{Details}{Person name(s) and role(s) with emoji indicator, with color coding}
 #'   \item{Activity}{Week, day, time, and lab location}
 #' }
 #' 
@@ -25,10 +26,13 @@
 #'   \item{🟢}{Addition - new person added to a slot}
 #'   \item{🔴}{Removal - person removed from a slot}
 #'   \item{🔄}{Replacement - person replaced by another in the same slot}
+#'   \item{💰}{Paycode change - person's role changed in the same slot (e.g., Tutor (repeat) → Tutor)}
 #' }
 #'
-#' Color coding: additions are shown in green, removals in red, and replacements
+#' Color coding: additions are shown in green, removals in red, replacements
 #' show the removed name struck through in red and the new name in bold green.
+#' Paycode changes show the person's name in bold green with the old role in red
+#' and the new role in green.
 #' 
 #' @examples
 #' \dontrun{
@@ -58,18 +62,20 @@ document_changes <- function(compare_result) {
   additions <- changes$additions
   removals <- changes$removals
   replacements <- changes$replacements
+  paycode_changes <- changes$paycode_changes
   
   # Calculate totals
   total_changes <- nrow(additions) + nrow(removals) + nrow(replacements)
   n_additions <- nrow(additions)
   n_removals <- nrow(removals)
   n_replacements <- nrow(replacements)
+  n_paycode_changes <- if (is.null(paycode_changes)) 0 else nrow(paycode_changes)
   
   # Print header
   cli::cat_line("\nRoster Changes Summary")
   cli::cat_line("======================")
-  cli::cat_line(sprintf("Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d", 
-                        total_changes, n_additions, n_removals, n_replacements))
+  cli::cat_line(sprintf("Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d  | Paycode changes: %2d", 
+                        total_changes, n_additions, n_removals, n_replacements, n_paycode_changes))
   cli::cat_line()
   
   # Function to format activity
@@ -90,11 +96,26 @@ document_changes <- function(compare_result) {
   }
   
   # Collect all changes into one data frame
-  all_changes <- dplyr::bind_rows(
+  change_list <- list(
     additions %>% dplyr::mutate(type = "Addition", details = sprintf("%s (%s)", cli::style_bold(cli::col_green(name)), role)),
     removals %>% dplyr::mutate(type = "Removal", details = sprintf("%s (%s)", cli::style_bold(cli::col_red(name)), role)),
     replacements %>% dplyr::mutate(type = "Replacement", details = sprintf("%s → %s (%s)", cli::style_strikethrough(cli::col_red(name_removed)), cli::style_bold(cli::col_green(name_added)), role))
-  ) %>% dplyr::arrange(date)
+  )
+  
+  # Add paycode changes if they exist
+  if (!is.null(paycode_changes) && nrow(paycode_changes) > 0) {
+    paycode_changes_formatted <- paycode_changes %>%
+      dplyr::mutate(
+        type = "Paycode change",
+        details = sprintf("%s (%s → %s)", cli::style_bold(cli::col_green(name)), 
+                         cli::col_red(role_prev), cli::col_green(role_latest)),
+        role = role_latest
+      ) %>%
+      dplyr::select(date, day, start, end, location, name, week, type, details, role)
+    change_list <- append(change_list, list(paycode_changes_formatted))
+  }
+  
+  all_changes <- dplyr::bind_rows(change_list) %>% dplyr::arrange(date)
   
   if (nrow(all_changes) == 0) {
     cli::cat_line("No changes detected.")
@@ -160,6 +181,9 @@ document_changes <- function(compare_result) {
     cli::cat_line(row_str)
   }
   
-  # Return the dataframe invisibly
+    # Return the dataframe invisibly
   invisible(df)
 }
+
+# Suppress R CMD check notes for non-standard evaluation variables
+utils::globalVariables(c("name", "role", "name_removed", "name_added", "role_prev", "role_latest", "location", "week", "type", "details", "date", "day", "start", "end"))

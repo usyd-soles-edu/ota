@@ -40,6 +40,7 @@
 #' @importFrom dplyr inner_join anti_join select
 #' @keywords internal
 #' @export
+#' @importFrom rlang .data
 compare <- function(df) {
   # Extract unit and logs directory from the dataframe attributes
   unit <- attr(df, "unit")
@@ -63,31 +64,83 @@ compare <- function(df) {
   latest_mutated <- mutate_tutor_roles(latest_pair$latest)
   previous_mutated <- mutate_tutor_roles(latest_pair$previous)
   
+  # Find common columns between the two versions for comparison
+  # This handles cases where one version has paycode and the other doesn't
+  common_join_cols <- intersect(names(latest_mutated), names(previous_mutated))
+  
   # Detect additions: rows in latest but not in previous
-  additions <- dplyr::anti_join(latest_mutated, previous_mutated, by = names(latest_mutated))
+  additions <- dplyr::anti_join(latest_mutated, previous_mutated, by = common_join_cols)
   
   # Detect removals: rows in previous but not in latest
-  removals <- dplyr::anti_join(previous_mutated, latest_mutated, by = names(previous_mutated))
+  removals <- dplyr::anti_join(previous_mutated, latest_mutated, by = common_join_cols)
   
   # Detect replacements: slots where a person was removed and another added
+  # Use only the subset of columns that exclude paycode (if present) for replacement detection
   common_cols <- c("date", "day", "start", "end", "location", "role", "week")
   replacements <- dplyr::inner_join(removals, additions, by = common_cols, suffix = c("_removed", "_added"))
   
   # Remove replacements from additions and removals to get pure additions/removals
   if (nrow(replacements) > 0) {
+    # Get the common columns between additions/removals (excluding paycode if present)
+    add_remove_join_cols <- intersect(names(additions), common_cols)
+    
     replacements_add <- dplyr::select(replacements, all_of(common_cols), name = name_added)
     replacements_rem <- dplyr::select(replacements, all_of(common_cols), name = name_removed)
     
-    additions <- dplyr::anti_join(additions, replacements_add, by = names(additions))
-    removals <- dplyr::anti_join(removals, replacements_rem, by = names(removals))
+    # Use only common columns for anti_join to handle paycode differences
+    additions <- dplyr::anti_join(additions, replacements_add, by = add_remove_join_cols)
+    removals <- dplyr::anti_join(removals, replacements_rem, by = add_remove_join_cols)
+  }
+  
+  # Detect paycode changes: same person, same slot, but different role/paycode
+  # This happens when staff change their tutorial position (e.g., drop first tutorial → becomes Tutor instead of Tutor (repeat))
+  paycode_changes <- NULL
+  if ("paycode" %in% names(latest_mutated) && "paycode" %in% names(previous_mutated)) {
+    # Find rows with same date, day, start, end, location, name, week but different role
+    slot_cols <- c("date", "day", "start", "end", "location", "name", "week")
+    slot_matches <- dplyr::inner_join(
+      previous_mutated %>% dplyr::select(all_of(slot_cols), role_prev = role, paycode_prev = paycode),
+      latest_mutated %>% dplyr::select(all_of(slot_cols), role_latest = role, paycode_latest = paycode),
+      by = slot_cols
+    )
+    
+    # Filter to only rows where role/paycode actually changed
+    if (nrow(slot_matches) > 0) {
+      paycode_changes <- slot_matches %>%
+        dplyr::filter(role_prev != role_latest) %>%
+        dplyr::select(all_of(slot_cols), role_prev, role_latest, paycode_prev, paycode_latest)
+      
+      if (nrow(paycode_changes) == 0) {
+        paycode_changes <- NULL
+      } else {
+        # Remove paycode changes from additions and removals since they're already tracked
+        # Only use common columns for the anti_join to handle paycode column differences
+        slot_cols_with_role <- c("date", "day", "start", "end", "location", "name", "week", "role")
+        
+        removals_to_remove <- paycode_changes %>%
+          dplyr::select(all_of(slot_cols)) %>%
+          dplyr::mutate(role = paycode_changes$role_prev)
+        
+        additions_to_remove <- paycode_changes %>%
+          dplyr::select(all_of(slot_cols)) %>%
+          dplyr::mutate(role = paycode_changes$role_latest)
+        
+        removals <- dplyr::anti_join(removals, removals_to_remove, by = slot_cols_with_role)
+        additions <- dplyr::anti_join(additions, additions_to_remove, by = slot_cols_with_role)
+      }
+    }
   }
   
   # Return the changes and df
   changes <- list(
     additions = additions,
     removals = removals,
-    replacements = replacements
+    replacements = replacements,
+    paycode_changes = paycode_changes
   )
   
   return(list(changes = changes, df = df))
 }
+
+# Suppress R CMD check notes for non-standard evaluation variables
+utils::globalVariables(c("name_added", "name_removed", "role", "paycode", "role_prev", "role_latest", "paycode_prev", "paycode_latest"))

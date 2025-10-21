@@ -8,7 +8,8 @@ document_changes(compare_result)
 }
 \arguments{
 \item{compare_result}{A list returned by \code{\link{compare}()}, containing
-changes (a list of additions, removals, and replacements) and the original dataframe.}
+changes (a list of additions, removals, replacements, and paycode_changes) 
+and the original dataframe.}
 }
 \value{
 Invisibly returns the original dataframe, allowing for function chaining.
@@ -16,16 +17,16 @@ Invisibly returns the original dataframe, allowing for function chaining.
 \description{
 This function takes the result from a comparison and prints a formatted,
 color-coded summary of changes including additions (in green), removals 
-(in red), and replacements (showing old crossed-out and new in green).
-The output is organized by date with a formatted table layout and includes
-helpful emoji indicators (🟢 for additions, 🔴 for removals, 🔄 for replacements).
+(in red), replacements (showing old crossed-out and new in green), and
+paycode changes (showing role transitions). The output is organized by date 
+with a formatted table layout and includes helpful emoji indicators.
 }
 \details{
 The function displays changes in a formatted table with the following columns:
 \itemize{
   \item{Date}{The date of the roster change}
-  \item{Type}{The type of change (Addition, Removal, or Replacement)}
-  \item{Details}{Person name(s) and role with emoji indicator, with color coding}
+  \item{Type}{The type of change (Addition, Removal, Replacement, or Paycode change)}
+  \item{Details}{Person name(s) and role(s) with emoji indicator, with color coding}
   \item{Activity}{Week, day, time, and lab location}
 }
 
@@ -34,10 +35,13 @@ Emoji indicators:
   \item{🟢}{Addition - new person added to a slot}
   \item{🔴}{Removal - person removed from a slot}
   \item{🔄}{Replacement - person replaced by another in the same slot}
+  \item{💰}{Paycode change - person's role changed in the same slot (e.g., Tutor (repeat) → Tutor)}
 }
 
-Color coding: additions are shown in green, removals in red, and replacements
+Color coding: additions are shown in green, removals in red, replacements
 show the removed name struck through in red and the new name in bold green.
+Paycode changes show the person's name in bold green with the old role in red
+and the new role in green.
 }
 \examples{
 \dontrun{
