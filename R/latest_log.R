@@ -1,5 +1,25 @@
-# Internal function to read the two latest log files for a given unit
+#' Read the Two Latest Log Files for a Unit
+#'
+#' An internal helper function that retrieves and reads the two most recent
+#' timestamped log files for a given unit. Used by \code{\link{compare}()} to
+#' detect changes between snapshots.
+#'
+#' @param unit A character string identifying the unit (e.g., "biol1007").
+#' @param logs_dir The directory path where log CSV files are stored.
+#'
+#' @return A list with elements:
+#'   \item{latest}{Dataframe of the most recent log file}
+#'   \item{previous}{Dataframe of the second-most recent log file}
+#'   
+#'   Returns \code{NULL} if fewer than 2 log files exist for the unit.
+#'
+#' @details
+#' Log files are identified by the pattern \code{<unit>-*.csv} in the
+#' logs directory. Files are sorted by name (which corresponds to timestamp
+#' due to YYYY-MM-DD-HHmmss naming convention) to identify the latest two.
+#'
 #' @importFrom readr read_csv cols col_date col_character col_integer
+#' @keywords internal
 .latest_pair <- function(unit, logs_dir) {
   # List existing log files for this unit
   log_files <- list.files(logs_dir, pattern = paste0(unit, "-.*\\.csv$"), full.names = TRUE)

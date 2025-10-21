@@ -1,4 +1,47 @@
-# Document changes function to provide plain English documentation of additions, removals, and replacements
+#' @title Document Roster Changes
+#' @description 
+#' This function takes the result from a comparison and prints a formatted,
+#' color-coded summary of changes including additions (in green), removals 
+#' (in red), and replacements (showing old crossed-out and new in green).
+#' The output is organized by date with a formatted table layout and includes
+#' helpful emoji indicators (🟢 for additions, 🔴 for removals, 🔄 for replacements).
+#' 
+#' @param compare_result A list returned by \code{\link{compare}()}, containing
+#'   changes (a list of additions, removals, and replacements) and the original dataframe.
+#' 
+#' @return Invisibly returns the original dataframe, allowing for function chaining.
+#' 
+#' @details
+#' The function displays changes in a formatted table with the following columns:
+#' \itemize{
+#'   \item{Date}{The date of the roster change}
+#'   \item{Type}{The type of change (Addition, Removal, or Replacement)}
+#'   \item{Details}{Person name(s) and role with emoji indicator, with color coding}
+#'   \item{Activity}{Week, day, time, and lab location}
+#' }
+#' 
+#' Emoji indicators:
+#' \itemize{
+#'   \item{🟢}{Addition - new person added to a slot}
+#'   \item{🔴}{Removal - person removed from a slot}
+#'   \item{🔄}{Replacement - person replaced by another in the same slot}
+#' }
+#'
+#' Color coding: additions are shown in green, removals in red, and replacements
+#' show the removed name struck through in red and the new name in bold green.
+#' 
+#' @examples
+#' \dontrun{
+#' # Load, snapshot, and compare rosters
+#' df <- roster("path/to/roster.xlsx", unit = "biol1007")
+#' snapshot(df)
+#' # ... make changes to the Excel file ...
+#' df_new <- roster("path/to/roster.xlsx", unit = "biol1007")
+#' snapshot(df_new)
+#' result <- compare(df_new)
+#' document_changes(result)  # Displays formatted summary
+#' }
+#'
 #' @importFrom dplyr inner_join anti_join select mutate pull filter arrange bind_rows
 #' @importFrom lubridate day month year
 #' @importFrom cli style_strikethrough style_bold ansi_nchar ansi_strip col_green col_red
@@ -48,9 +91,9 @@ document_changes <- function(compare_result) {
   
   # Collect all changes into one data frame
   all_changes <- dplyr::bind_rows(
-    additions %>% dplyr::mutate(type = "Addition", details = sprintf("%s (%s)", cli::style_bold(cli::col_green(name)), role)),
-    removals %>% dplyr::mutate(type = "Removal", details = sprintf("%s (%s)", cli::style_bold(cli::col_red(name)), role)),
-    replacements %>% dplyr::mutate(type = "Replacement", details = sprintf("%s → %s (%s)", cli::style_strikethrough(cli::col_red(name_removed)), cli::style_bold(cli::col_green(name_added)), role))
+    additions %>% dplyr::mutate(type = "Addition", details = sprintf("🟢 %s (%s)", cli::style_bold(cli::col_green(name)), role)),
+    removals %>% dplyr::mutate(type = "Removal", details = sprintf("🔴 %s (%s)", cli::style_bold(cli::col_red(name)), role)),
+    replacements %>% dplyr::mutate(type = "Replacement", details = sprintf("🔄 %s → %s (%s)", cli::style_strikethrough(cli::col_red(name_removed)), cli::style_bold(cli::col_green(name_added)), role))
   ) %>% dplyr::arrange(date)
   
   if (nrow(all_changes) == 0) {
