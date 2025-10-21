@@ -1,5 +1,4 @@
 # Snapshot function to save roster output to a timestamped CSV in a logs folder
-#' @importFrom readr read_csv cols col_date col_character col_integer
 #' @importFrom dplyr anti_join
 snapshot <- function(df) {
   # Extract the file path from the dataframe attribute
@@ -17,29 +16,11 @@ snapshot <- function(df) {
   logs_dir <- file.path(dir_path, "logs")
   dir.create(logs_dir, showWarnings = FALSE, recursive = TRUE)
   
-  # List existing log files for this unit
-  log_files <- list.files(logs_dir, pattern = paste0(unit, "-.*\\.csv$"), full.names = TRUE)
+  # Read the latest pair of log files if they exist
+  latest_pair <- .latest_pair(unit, logs_dir)
   
-  if (length(log_files) > 0) {
-    # Get the latest log file (assuming filenames are sortable by timestamp)
-    latest_log <- sort(log_files)[length(log_files)]
-    
-    # Read the latest log file
-    latest_df <- readr::read_csv(
-      latest_log,
-      col_types = readr::cols(
-        date = readr::col_date(),
-        day = readr::col_character(),
-        start = readr::col_character(),
-        end = readr::col_character(),
-        location = readr::col_character(),
-        name = readr::col_character(),
-        role = readr::col_character(),
-        week = readr::col_integer()
-      ),
-      show_col_types = FALSE
-    )
-    
+  if (!is.null(latest_pair)) {
+    latest_df <- latest_pair$latest
     # Check if current df is identical to the latest log
     diff1 <- dplyr::anti_join(df, latest_df, by = names(df))
     diff2 <- dplyr::anti_join(latest_df, df, by = names(df))

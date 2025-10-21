@@ -1,40 +1,52 @@
-# Internal function to find the latest CSV file in a folder based on timestamp in filename
-.latest_log <- function(folder_path) {
-  # List all CSV files in the folder
-  csv_files <- list.files(folder_path, pattern = "\\.csv$", full.names = TRUE)
+# Internal function to read the two latest log files for a given unit
+#' @importFrom readr read_csv cols col_date col_character col_integer
+.latest_pair <- function(unit, logs_dir) {
+  # List existing log files for this unit
+  log_files <- list.files(logs_dir, pattern = paste0(unit, "-.*\\.csv$"), full.names = TRUE)
   
-  if (length(csv_files) == 0) {
-    stop("No CSV files found in the specified folder.")
+  if (length(log_files) == 0) {
+    return(NULL)
   }
   
-  # Function to extract timestamp from filename
-  extract_timestamp <- function(file_path) {
-    # Get the basename
-    filename <- basename(file_path)
-    # Remove .csv extension
-    name_without_ext <- sub("\\.csv$", "", filename)
-    # Split by '-'
-    parts <- strsplit(name_without_ext, "-")[[1]]
-    if (length(parts) == 4) {
-      # Format: yyyy-mm-dd-hhmmss
-      timestamp_parts <- parts
-    } else if (length(parts) == 5) {
-      # Format: prefix-yyyy-mm-dd-hhmmss
-      timestamp_parts <- parts[2:5]
-    } else {
-      stop("Filename does not match expected format: ", filename)
-    }
-    timestamp_str <- paste(timestamp_parts, collapse = "-")
-    # Convert to POSIXct
-    as.POSIXct(timestamp_str, format = "%Y-%m-%d-%H%M%S")
+  # Sort log files by name (timestamp)
+  sorted_logs <- sort(log_files)
+  n <- length(sorted_logs)
+  
+  # Read the latest log file
+  latest_df <- readr::read_csv(
+    sorted_logs[n],
+    col_types = readr::cols(
+      date = readr::col_date(),
+      day = readr::col_character(),
+      start = readr::col_character(),
+      end = readr::col_character(),
+      location = readr::col_character(),
+      name = readr::col_character(),
+      role = readr::col_character(),
+      week = readr::col_integer()
+    ),
+    show_col_types = FALSE
+  )
+  
+  if (n == 1) {
+    return(list(latest = latest_df, previous = NULL))
   }
   
-  # Extract timestamps for all files
-  timestamps <- sapply(csv_files, extract_timestamp)
+  # Read the previous log file
+  previous_df <- readr::read_csv(
+    sorted_logs[n - 1],
+    col_types = readr::cols(
+      date = readr::col_date(),
+      day = readr::col_character(),
+      start = readr::col_character(),
+      end = readr::col_character(),
+      location = readr::col_character(),
+      name = readr::col_character(),
+      role = readr::col_character(),
+      week = readr::col_integer()
+    ),
+    show_col_types = FALSE
+  )
   
-  # Find the index of the latest timestamp
-  latest_index <- which.max(timestamps)
-  
-  # Return the path of the latest file
-  csv_files[latest_index]
+  return(list(latest = latest_df, previous = previous_df))
 }
