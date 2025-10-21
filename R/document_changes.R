@@ -23,7 +23,7 @@ document_changes <- function(compare_result) {
   n_replacements <- nrow(replacements)
   
   # Print header
-  cli::cat_line("Roster Changes Summary")
+  cli::cat_line("\nRoster Changes Summary")
   cli::cat_line("======================")
   cli::cat_line(sprintf("Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d", 
                         total_changes, n_additions, n_removals, n_replacements))
