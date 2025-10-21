@@ -91,9 +91,9 @@ document_changes <- function(compare_result) {
   
   # Collect all changes into one data frame
   all_changes <- dplyr::bind_rows(
-    additions %>% dplyr::mutate(type = "Addition", details = sprintf("🟢 %s (%s)", cli::style_bold(cli::col_green(name)), role)),
-    removals %>% dplyr::mutate(type = "Removal", details = sprintf("🔴 %s (%s)", cli::style_bold(cli::col_red(name)), role)),
-    replacements %>% dplyr::mutate(type = "Replacement", details = sprintf("🔄 %s → %s (%s)", cli::style_strikethrough(cli::col_red(name_removed)), cli::style_bold(cli::col_green(name_added)), role))
+    additions %>% dplyr::mutate(type = "Addition", details = sprintf("%s (%s)", cli::style_bold(cli::col_green(name)), role)),
+    removals %>% dplyr::mutate(type = "Removal", details = sprintf("%s (%s)", cli::style_bold(cli::col_red(name)), role)),
+    replacements %>% dplyr::mutate(type = "Replacement", details = sprintf("%s → %s (%s)", cli::style_strikethrough(cli::col_red(name_removed)), cli::style_bold(cli::col_green(name_added)), role))
   ) %>% dplyr::arrange(date)
   
   if (nrow(all_changes) == 0) {
