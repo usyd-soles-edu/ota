@@ -279,7 +279,7 @@ generate_html_summary <- function(all_changes,
   filename <- sprintf("%s-changes-%s.html", unit, timestamp)
   filepath <- file.path(output_dir, filename)
 
-  # Start HTML document
+  # Start HTML document with basic styling
   html_parts <- c(
     "<!DOCTYPE html>",
     "<html>",
@@ -288,55 +288,46 @@ generate_html_summary <- function(all_changes,
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
     "<title>Roster Changes Summary</title>",
     "<style>",
-    "  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 16px; background-color: #f9fafb; }",
-    "  .container { max-width: 900px; margin: 0 auto; background-color: white; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; }",
-    "  h1 { margin: 0 0 8px 0; font-size: 20px; color: #1f2937; }",
-    "  .summary-header { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }",
-    "  .summary-stat { }",
-    "  .stat-label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; }",
-    "  .stat-value { font-size: 24px; font-weight: bold; color: #1f2937; margin-top: 4px; }",
-    "  .stat-value.additions { color: #22c55e; }",
-    "  .stat-value.removals { color: #ef4444; }",
-    "  .stat-value.replacements { color: #f59e0b; }",
-    "  .stat-value.paycode { color: #3b82f6; }",
-    "  table { width: 100%; border-collapse: collapse; margin-top: 12px; }",
-    "  th { text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; border-bottom: 2px solid #e5e7eb; padding: 8px 12px; }",
-    "  td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }",
-    "  tr:hover { background-color: #f9fafb; }",
-    "  .type-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: white; text-align: center; min-width: 100px; }",
-    "  .type-addition { background-color: #22c55e; }",
-    "  .type-removal { background-color: #ef4444; }",
-    "  .type-replacement { background-color: #f59e0b; }",
-    "  .type-paycode { background-color: #3b82f6; }",
-    "  .details { font-weight: 500; }",
-    "  .activity { color: #6b7280; font-size: 12px; }",
-    "  .timestamp { font-size: 11px; color: #9ca3af; margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; }",
+    "  body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background-color: #ffffff; }",
+    "  .container { max-width: 900px; margin: 0 auto; }",
+    "  h1 { font-size: 22px; color: #333333; margin: 0 0 16px 0; }",
+    "  .summary-stats { margin-bottom: 24px; }",
+    "  .stats-row { display: flex; gap: 24px; flex-wrap: wrap; }",
+    "  .stat-item { min-width: 120px; }",
+    "  .stat-label { font-size: 12px; color: #666666; text-transform: uppercase; font-weight: bold; }",
+    "  .stat-value { font-size: 24px; font-weight: bold; color: #333333; margin-top: 4px; }",
+    "  .stat-additions { color: #16a34a; }",
+    "  .stat-removals { color: #ef4444; }",
+    "  .stat-replacements { color: #f59e0b; }",
+    "  .stat-paycode { color: #3b82f6; }",
+    "  table { width: 100%; border-collapse: collapse; margin-top: 0; }",
+    "  th { text-align: left; font-size: 12px; font-weight: bold; color: #ffffff; background-color: #333333; padding: 10px; border: 1px solid #333333; }",
+    "  td { padding: 10px; border: 1px solid #dddddd; font-size: 13px; }",
+    "  tr:nth-child(even) { background-color: #f9f9f9; }",
+    "  .text-success { color: #16a34a; font-weight: bold; }",
+    "  .text-danger { color: #ef4444; font-weight: bold; }",
+    "  .text-warning { color: #f59e0b; font-weight: bold; }",
+    "  .text-info { color: #3b82f6; font-weight: bold; }",
+    "  .strikethrough { text-decoration: line-through; }",
+    "  .footer { font-size: 11px; color: #999999; margin-top: 20px; padding-top: 12px; border-top: 1px solid #dddddd; }",
     "</style>",
     "</head>",
     "<body>",
     "<div class=\"container\">",
     sprintf("<h1>Roster Changes Summary - %s</h1>", unit),
-    "<div class=\"summary-header\">",
-    sprintf(
-      "<div class=\"summary-stat\"><div class=\"stat-label\">Total Changes</div><div class=\"stat-value\">%d</div></div>",
-      total_changes
-    ),
-    sprintf(
-      "<div class=\"summary-stat\"><div class=\"stat-label\">Additions</div><div class=\"stat-value additions\">%d</div></div>",
-      n_additions
-    ),
-    sprintf(
-      "<div class=\"summary-stat\"><div class=\"stat-label\">Removals</div><div class=\"stat-value removals\">%d</div></div>",
-      n_removals
-    ),
-    sprintf(
-      "<div class=\"summary-stat\"><div class=\"stat-label\">Replacements</div><div class=\"stat-value replacements\">%d</div></div>",
-      n_replacements
-    ),
-    sprintf(
-      "<div class=\"summary-stat\"><div class=\"stat-label\">Paycode Changes</div><div class=\"stat-value paycode\">%d</div></div>",
-      n_paycode_changes
-    ),
+    "<div class=\"summary-stats\">",
+    "<div class=\"stats-row\">"
+  )
+
+  # Add summary statistics
+  html_parts <- c(
+    html_parts,
+    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Total Changes</div><div class=\"stat-value\">%d</div></div>", total_changes),
+    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Additions</div><div class=\"stat-value stat-additions\">%d</div></div>", n_additions),
+    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Removals</div><div class=\"stat-value stat-removals\">%d</div></div>", n_removals),
+    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Replacements</div><div class=\"stat-value stat-replacements\">%d</div></div>", n_replacements),
+    sprintf("<div class=\"stat-item\"><div class=\"stat-label\">Paycode Changes</div><div class=\"stat-value stat-paycode\">%d</div></div>", n_paycode_changes),
+    "</div>",
     "</div>",
     "<table>",
     "<thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Activity</th></tr></thead>",
@@ -371,19 +362,16 @@ generate_html_summary <- function(all_changes,
                         start_conv,
                         end_conv)
 
-    # Format details based on type
-    type_lower <- tolower(gsub(" ", "-", row$type))
-    type_badge_class <- paste0("type-", type_lower)
-
-    # Extract details - strip ANSI codes if present
-    details <- cli::ansi_strip(row$details)
+    # Determine type badge class
+    
+    # Format details with HTML styling
+    details_html <- format_details_html(row$type, row$details)
 
     html_row <- sprintf(
-      "<tr><td>%s</td><td><span class=\"type-badge %s\">%s</span></td><td class=\"details\">%s</td><td class=\"activity\">%s</td></tr>",
+      "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
       date_str,
-      type_badge_class,
       row$type,
-      details,
+      details_html,
       activity
     )
 
@@ -396,7 +384,7 @@ generate_html_summary <- function(all_changes,
     "</tbody>",
     "</table>",
     sprintf(
-      "<div class=\"timestamp\">Generated: %s | Unit: %s</div>",
+      "<div class=\"footer\">Generated: %s | Unit: %s</div>",
       format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
       unit
     ),
@@ -410,6 +398,41 @@ generate_html_summary <- function(all_changes,
 
   # Return full file path
   return(filepath)
+}
+
+# Helper function to format details text with HTML styling
+format_details_html <- function(type, details_text) {
+  # Strip ANSI codes first
+  clean_text <- cli::ansi_strip(details_text)
+  
+  if (type == "Addition") {
+    # Format: Name (Role) - green and bold
+    return(sprintf("<span class=\"text-success\">%s</span>", clean_text))
+  } else if (type == "Removal") {
+    # Format: Name (Role) - red and bold
+    return(sprintf("<span class=\"text-danger\">%s</span>", clean_text))
+  } else if (type == "Replacement") {
+    # Format: OldName → NewName (Role)
+    # Use regex to split on arrow and extract components
+    arrow_pattern <- "^(.+?) → (.+?) \\((.+)\\)$"
+    
+    if (grepl(arrow_pattern, clean_text)) {
+      old_name <- sub(arrow_pattern, "\\1", clean_text)
+      new_name <- sub(arrow_pattern, "\\2", clean_text)
+      role <- sub(arrow_pattern, "\\3", clean_text)
+      
+      return(sprintf(
+        "<span class=\"strikethrough text-danger\">%s</span> → <span class=\"text-success\">%s</span> <span style=\"color: #666666;\">(%s)</span>",
+        old_name, new_name, role
+      ))
+    }
+    return(sprintf("<span class=\"text-warning\">%s</span>", clean_text))
+  } else if (type == "Paycode change") {
+    # Format: Name (Role1 → Role2) - colored
+    return(sprintf("<span class=\"text-info\">%s</span>", clean_text))
+  }
+  
+  return(clean_text)
 }
 
 # Suppress R CMD check notes for non-standard evaluation variables
