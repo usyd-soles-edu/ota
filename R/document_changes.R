@@ -108,7 +108,7 @@ document_changes <- function(compare_result) {
       dplyr::mutate(
         type = "Paycode change",
         details = sprintf("%s (%s → %s)", cli::style_bold(cli::col_green(name)), 
-                         cli::col_red(role_prev), cli::col_green(role_latest)),
+                         cli::style_strikethrough(cli::col_red(role_prev)), cli::style_bold(cli::col_green(role_latest))),
         role = role_latest
       ) %>%
       dplyr::select(date, day, start, end, location, name, week, type, details, role)
