@@ -1,8 +1,8 @@
 #' Read the Two Latest Log Files for a Unit
 #'
 #' An internal helper function that retrieves and reads the two most recent
-#' timestamped log files for a given unit. Used by \code{\link{compare}()} to
-#' detect changes between snapshots.
+#' timestamped log files for a given unit. Used exclusively by \code{\link{compare}()} to
+#' detect changes between successive snapshots.
 #'
 #' @param unit A character string identifying the unit (e.g., "biol1007").
 #' @param logs_dir The directory path where log CSV files are stored.
@@ -11,12 +11,19 @@
 #'   \item{latest}{Dataframe of the most recent log file}
 #'   \item{previous}{Dataframe of the second-most recent log file}
 #'   
-#'   Returns \code{NULL} if fewer than 2 log files exist for the unit.
+#'   Returns \code{NULL} if fewer than 2 log files exist for the unit. This
+#'   ensures \code{compare()} can only execute when there are two snapshots
+#'   to compare.
 #'
 #' @details
 #' Log files are identified by the pattern \code{<unit>-*.csv} in the
 #' logs directory. Files are sorted by name (which corresponds to timestamp
 #' due to YYYY-MM-DD-HHmmss naming convention) to identify the latest two.
+#'
+#' This function is specifically designed for \code{\link{compare}()} and
+#' requires at least 2 log files to exist. For checking if current data
+#' matches the latest log file, \code{\link{snapshot}()} has its own internal
+#' comparison logic and does not use this function.
 #'
 #' @importFrom readr read_csv cols col_date col_character col_integer
 #' @keywords internal
