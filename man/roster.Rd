@@ -17,5 +17,5 @@ A dataframe in long format with roster assignments.
 \description{
 This function reads a roster Excel file, cleans and transforms it into a
 long-format dataframe with columns: date, day, start, end, location, name,
-role. Different units have different processing logic.
+role, week, activity. Different units have different processing logic.
 }

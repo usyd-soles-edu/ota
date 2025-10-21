@@ -3,7 +3,7 @@
 #' This function handles roster processing specific to BIOL1007 unit.
 #'
 #' @param file_path Path to the Excel file containing the roster data.
-#' @return A dataframe in long format with roster assignments.
+#' @return A dataframe in long format with columns: date, day, start, end, location, name, role, week, activity.
 #' @importFrom readxl read_excel
 #' @importFrom dplyr %>% select all_of filter mutate across where na_if
 #'   case_when
@@ -81,8 +81,9 @@ roster_biol1007 <- function(file_path) {
         TRUE ~ NA_character_
       ),
       week = as.integer(Week),
+      activity = .data$Practical,
     ) %>%
-    select(date, day, start, end, location, name, role, week)
+    select(date, day, start, end, location, name, role, week, activity)
 
   # Attach the file path and unit as attributes to the returned dataframe
   attr(df_long, "file_path") <- file_path

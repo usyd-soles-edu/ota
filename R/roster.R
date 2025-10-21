@@ -2,7 +2,7 @@
 #'
 #' This function reads a roster Excel file, cleans and transforms it into a
 #' long-format dataframe with columns: date, day, start, end, location, name,
-#' role. Different units have different processing logic.
+#' role, week, activity. Different units have different processing logic.
 #'
 #' @param file_path Path to the Excel file containing the roster data.
 #' @param unit The unit identifier (e.g., "BIOL1007", "BIOL2022", case-insensitive). Required.
