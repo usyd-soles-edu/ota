@@ -17,6 +17,7 @@ A list containing:
       \item{additions}{Rows in latest log not in previous log (new assignments)}
       \item{removals}{Rows in previous log not in latest log (removed assignments)}
       \item{replacements}{Slots where a person was replaced by another}
+      \item{paycode_changes}{Rows where a person's role changed in the same slot (e.g., Tutor (repeat) → Tutor)}
     }
   }
   \item{df}{The input dataframe}
@@ -34,16 +35,20 @@ tutor role labeling.
 Replacements are detected by matching on common columns (date, day, start, 
 end, location, role, week) where different names appear between versions.
 These are then removed from the additions and removals lists.
+
+This function is typically followed by \code{\link{summary}()} to display
+the detected changes in a formatted table or HTML report.
 }
 \examples{
 \dontrun{
-# Read and compare rosters
+# Read, compare, and summarize rosters
 df <- roster("path/to/roster.xlsx", unit = "biol1007")
 snapshot(df)  # Save current state
 # ... later, after roster is updated ...
 df_new <- roster("path/to/roster.xlsx", unit = "biol1007")
 snapshot(df_new)  # Save new state
 result <- compare(df_new)
+summary(result, HTML = TRUE)  # Display changes and generate HTML report
 }
 
 }
