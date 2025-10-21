@@ -1,5 +1,5 @@
 # Snapshot function to save roster output to a timestamped CSV in a logs folder
-#' @importFrom dplyr anti_join
+#' @importFrom dplyr anti_join arrange group_by mutate row_number if_else
 snapshot <- function(df) {
   # Extract the file path from the dataframe attribute
   file_path <- attr(df, "file_path")
@@ -35,6 +35,9 @@ snapshot <- function(df) {
   timestamp <- format(Sys.time(), "%Y-%m-%d-%H%M%S")
   csv_file <- paste0(unit, "-", timestamp, ".csv")
   csv_path <- file.path(logs_dir, csv_file)
+  
+  # Arrange the dataframe by name, date, start
+  df <- df %>% dplyr::arrange(name, date, start)
   
   # Save the dataframe to CSV
   write.csv(df, csv_path, row.names = FALSE)

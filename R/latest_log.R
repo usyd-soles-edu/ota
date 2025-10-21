@@ -4,7 +4,7 @@
   # List existing log files for this unit
   log_files <- list.files(logs_dir, pattern = paste0(unit, "-.*\\.csv$"), full.names = TRUE)
   
-  if (length(log_files) == 0) {
+  if (length(log_files) < 2) {
     return(NULL)
   }
   
@@ -12,9 +12,12 @@
   sorted_logs <- sort(log_files)
   n <- length(sorted_logs)
   
-  # Read the latest log file
+  # Read the two latest log files
+  latest_log <- sorted_logs[n]
+  previous_log <- sorted_logs[n - 1]
+  
   latest_df <- readr::read_csv(
-    sorted_logs[n],
+    latest_log,
     col_types = readr::cols(
       date = readr::col_date(),
       day = readr::col_character(),
@@ -28,13 +31,8 @@
     show_col_types = FALSE
   )
   
-  if (n == 1) {
-    return(list(latest = latest_df, previous = NULL))
-  }
-  
-  # Read the previous log file
   previous_df <- readr::read_csv(
-    sorted_logs[n - 1],
+    previous_log,
     col_types = readr::cols(
       date = readr::col_date(),
       day = readr::col_character(),
