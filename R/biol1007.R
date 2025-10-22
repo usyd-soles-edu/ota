@@ -10,9 +10,11 @@
 #' @importFrom tidyr fill pivot_longer
 #' @importFrom stringr str_extract str_replace str_detect str_starts
 roster_biol1007 <- function(file_path) {
+  lgr::lgr$info("Starting to process BIOL1007 roster data.")
   # For now, using the same logic as default
   # TODO: Customize for BIOL1007 specific requirements
   df <- suppressMessages(read_excel(file_path, sheet = 1, skip = 4))
+  lgr::lgr$info("Loaded roster data from the file.")
 
   # Validate that this is the correct roster file
   required_cols <- c("Week", "Practical", "Date", "Session")
@@ -23,10 +25,12 @@ roster_biol1007 <- function(file_path) {
   if (!any(str_starts(names(df), "Sup-"))) {
     stop("Invalid roster file: no 'Sup-' columns found.")
   }
+  lgr::lgr$info("Checked that the file has the required format.")
 
   # Fill down Week and Practical columns
   df <- df %>%
     fill(Week, Practical, .direction = "down")
+  lgr::lgr$debug("Filled in missing values for Week and Practical columns.")
 
   # Find the first column starting with "Sup-"
   sup_cols <- which(str_starts(names(df), "Sup-"))
@@ -48,6 +52,7 @@ roster_biol1007 <- function(file_path) {
 
   # Remove rows where Date is NA
   df <- df %>% filter(!is.na(Date))
+  lgr::lgr$debug("Removed rows with missing dates.")
 
   # Replace "." with NA
   df <- df %>% mutate(across(where(is.character), ~ na_if(., ".")))
@@ -84,10 +89,12 @@ roster_biol1007 <- function(file_path) {
       activity = .data$Practical,
     ) %>%
     select(date, day, start, end, location, name, role, week, activity)
+  lgr::lgr$info("Reformatted the data into the required structure.")
 
   # Attach the file path and unit as attributes to the returned dataframe
   attr(df_long, "file_path") <- file_path
   attr(df_long, "unit") <- "biol1007"
+  lgr::lgr$info("Finished processing BIOL1007 roster data.")
 
   return(df_long)
 }

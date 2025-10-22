@@ -21,5 +21,6 @@ Imports: readxl,
     stringr,
     readr,
     lubridate,
+    lgr,
     cli
 Suggests: testthat
