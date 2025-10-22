@@ -1,6 +1,6 @@
 Package: ota
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Online teaching allocation management for USYD
 Version: 0.1.0
 Authors@R: c(
     person(
@@ -9,9 +9,9 @@ Authors@R: c(
       role = c("aut", "cre")
     )
   )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Description: A package to create and manage rosters for OTA at USYD.
+    Useful for tracking roster changes.
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3
