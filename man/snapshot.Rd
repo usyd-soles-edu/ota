@@ -47,4 +47,3 @@ snapshot(df, force = TRUE)
 }
 
 }
-\keyword{internal}

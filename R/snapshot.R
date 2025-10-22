@@ -39,7 +39,7 @@
 #'
 #' @importFrom dplyr anti_join arrange group_by mutate row_number if_else
 #' @importFrom readr read_csv cols col_date col_character col_integer
-#' @keywords internal
+#' @export
 snapshot <- function(df, force = FALSE) {
   # Extract the file path from the dataframe attribute
   file_path <- attr(df, "file_path")
