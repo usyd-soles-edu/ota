@@ -1,16 +1,19 @@
 Package: ota
 Type: Package
-Title: Online teaching allocation management for USYD
+Title: Online Teaching Allocation Roster Management
 Version: 0.1.1
 Authors@R: c(
     person(
-      "Jane", "Doe",
-      email = "jane@example.com",
+      "Januar", "Harianto",
+      email = "januar.harianto@sydney.edu.au",
       role = c("aut", "cre")
     )
   )
-Description: A package to create and manage rosters for OTA at USYD.
-    Useful for tracking roster changes.
+Description: An R package for managing Online Teaching Allocation (OTA) rosters 
+    at the University of Sydney. Provides functions to load roster data from Excel, 
+    create timestamped snapshots, compare versions to track changes, and generate 
+    formatted reports with paycode management. Supports multiple teaching units and 
+    automatically identifies additions, removals, replacements, and role changes.
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
