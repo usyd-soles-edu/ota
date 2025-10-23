@@ -77,7 +77,8 @@ snapshot <- function(df, force = FALSE) {
           location = readr::col_character(),
           name = readr::col_character(),
           role = readr::col_character(),
-          week = readr::col_integer()
+          week = readr::col_integer(),
+          index = readr::col_character()
         ),
         show_col_types = FALSE
       )

@@ -3,7 +3,9 @@
 #' This function handles roster processing specific to BIOL1007 unit.
 #'
 #' @param file_path Path to the Excel file containing the roster data.
-#' @return A dataframe in long format with columns: date, day, start, end, location, name, role, week.
+#' @return A dataframe in long format with columns: date, day, start, end, location, name, role, week, index.
+#'   The index column tracks the original cell position (e.g., "Sup-1_row5") to facilitate tracking
+#'   roster changes like swaps, replacements, removals, and additions.
 #' @importFrom readxl read_excel
 #' @importFrom dplyr %>% select all_of filter mutate across where na_if
 #'   case_when
@@ -54,13 +56,17 @@ roster_biol1007 <- function(file_path) {
   df <- df %>% filter(!is.na(Date))
   lgr::lgr$debug("Removed rows with missing dates.")
 
+  # Add row index to track original cell position before pivot
+  df <- df %>%
+    mutate(row_index = row_number())
+
   # Pivot the Sup and Demo columns
   df_long <- df %>%
     pivot_longer(
       cols = starts_with(c("Sup-", "Demo-")),
       names_to = "role_loc",
       values_to = "name",
-      values_drop_na = TRUE
+      values_drop_na = FALSE
     ) %>%
     mutate(
       role = str_extract(role_loc, "^(Sup|Demo)"),
@@ -82,9 +88,10 @@ roster_biol1007 <- function(file_path) {
         str_detect(Session, "2-5pm") ~ "17:00",
         TRUE ~ NA_character_
       ),
-      week = as.integer(Week)
+      week = as.integer(Week),
+      index = paste0(role_loc, "_row", row_index)
     ) %>%
-    select(date, day, start, end, location, name, role, week)
+    select(date, day, start, end, location, name, role, week, index)
   lgr::lgr$info("Reformatted the data into the required structure.")
 
   # Attach the file path and unit as attributes to the returned dataframe

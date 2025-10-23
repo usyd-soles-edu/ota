@@ -25,13 +25,16 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   additions <- changes$additions
   removals <- changes$removals
   replacements <- changes$replacements
+  swaps <- changes$swaps
   paycode_changes <- changes$paycode_changes
 
   # Calculate totals
-  total_changes <- nrow(additions) + nrow(removals) + nrow(replacements)
+  total_changes <- nrow(additions) + nrow(removals) + nrow(replacements) + 
+    (if (is.null(swaps)) 0 else nrow(swaps))
   n_additions <- nrow(additions)
   n_removals <- nrow(removals)
   n_replacements <- nrow(replacements)
+  n_swaps <- if (is.null(swaps)) 0 else nrow(swaps)
   n_paycode_changes <- if (is.null(paycode_changes))
     0
   else
@@ -62,10 +65,32 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
         "%s → %s - %s",
         cli::style_strikethrough(cli::col_red(name_removed)),
         cli::style_bold(cli::col_green(name_added)),
-        role
-      )
-    )
+        role_added
+      ),
+      role = role_added
+    ) %>%
+      dplyr::select(date, day, start, end, location, name = name_added, role, week, type, details)
   )
+
+  # Add swaps if they exist
+  if (!is.null(swaps) && nrow(swaps) > 0) {
+    # For swaps, we show both people involved
+    swaps_formatted <- swaps %>%
+      dplyr::mutate(
+        type = "Swap",
+        details = sprintf(
+          "%s ↔ %s (roles: %s ↔ %s)",
+          cli::style_bold(cli::col_blue(name_removed)),
+          cli::style_bold(cli::col_blue(name_added)),
+          role_removed,
+          role_added
+        ),
+        role = role_added,
+        name = paste(name_removed, "↔", name_added)
+      ) %>%
+      dplyr::select(date, day, start, end, location, name, role, week, type, details, index)
+    change_list <- append(change_list, list(swaps_formatted))
+  }
 
   # Add paycode changes if they exist
   if (!is.null(paycode_changes) && nrow(paycode_changes) > 0) {
@@ -86,10 +111,11 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
                     end,
                     location,
                     name,
+                    role,
                     week,
                     type,
                     details,
-                    role)
+                    index)
     change_list <- append(change_list, list(paycode_changes_formatted))
   }
 
@@ -152,11 +178,12 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   cli::cat_line("======================")
   cli::cat_line(
     sprintf(
-      "Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d  | Paycode changes: %2d",
+      "Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d  | Swaps: %2d  | Paycode changes: %2d",
       total_changes,
       n_additions,
       n_removals,
       n_replacements,
+      n_swaps,
       n_paycode_changes
     )
   )
@@ -211,6 +238,7 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       n_additions,
       n_removals,
       n_replacements,
+      n_swaps,
       n_paycode_changes,
       file_path
     )
@@ -238,6 +266,7 @@ generate_html_summary <- function(all_changes,
                                   n_additions,
                                   n_removals,
                                   n_replacements,
+                                  n_swaps,
                                   n_paycode_changes,
                                   file_path = NULL) {
   timestamp <- format(Sys.time(), "%Y-%m-%d-%H%M%S")
@@ -357,6 +386,8 @@ utils::globalVariables(
     "name_added",
     "role_prev",
     "role_latest",
+    "role_added",
+    "role_removed",
     "location",
     "week",
     "type",
@@ -364,6 +395,8 @@ utils::globalVariables(
     "date",
     "day",
     "start",
-    "end"
+    "end",
+    "index",
+    "n"
   )
 )

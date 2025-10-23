@@ -1,8 +1,11 @@
 #' Compare Roster Changes Between Latest Log Files
 #'
-#' Detects additions, removals, and replacements between the two latest
+#' Detects additions, removals, swaps, and replacements between the two latest
 #' roster log files for a given unit. This function reads the previous and
 #' latest snapshots and compares them to identify what has changed.
+#'
+#' The `index` column (e.g., "Sup-1_row5") tracks the original cell position
+#' before the pivot, allowing easy detection of what happened at each position.
 #'
 #' @param df A dataframe with roster data, typically returned by \code{\link{roster}()}.
 #'   Must have attributes \code{unit} and \code{file_path} set.
@@ -10,22 +13,20 @@
 #' @return A list containing:
 #'   \item{changes}{A list with elements:
 #'     \itemize{
-#'       \item{additions}{Rows in latest log not in previous log (new assignments)}
-#'       \item{removals}{Rows in previous log not in latest log (removed assignments)}
-#'       \item{replacements}{Slots where a person was replaced by another}
-#'       \item{paycode_changes}{Rows where a person's role changed in the same slot (e.g., Tutor (repeat) → Tutor)}
+#'       \item{additions}{New staff in positions that were previously empty (name was NA)}
+#'       \item{removals}{Staff removed (names become NA) or positions left empty}
+#'       \item{replacements}{Same position (index) but different person}
+#'       \item{swaps}{Two staff members swap positions in the same lab/time slot}
+#'       \item{paycode_changes}{Same person, same position, but different role/paycode}
 #'     }
 #'   }
 #'   \item{df}{The input dataframe}
 #'
 #' @details
-#' Both the latest and previous log files are processed with 
-#' \code{\link{mutate_tutor_roles}()} before comparison to ensure consistent
-#' tutor role labeling.
-#'
-#' Replacements are detected by matching on common columns (date, day, start, 
-#' end, location, role, week) where different names appear between versions.
-#' These are then removed from the additions and removals lists.
+#' Change detection is now simplified by leveraging the `index` column which
+#' uniquely identifies each roster cell position. Both the latest and previous
+#' log files are processed with \code{\link{mutate_tutor_roles}()} before
+#' comparison to ensure consistent tutor role labeling.
 #'
 #' This function is typically followed by \code{\link{summary}()} to display
 #' the detected changes in a formatted table or HTML report.
@@ -42,7 +43,7 @@
 #' summary(result, HTML = TRUE)  # Display changes and generate HTML report
 #' }
 #'
-#' @importFrom dplyr inner_join anti_join select
+#' @importFrom dplyr left_join anti_join select mutate filter
 #' @keywords internal
 #' @export
 #' @importFrom rlang .data
@@ -69,8 +70,90 @@ compare <- function(df) {
   latest_mutated <- mutate_tutor_roles(latest_pair$latest)
   previous_mutated <- mutate_tutor_roles(latest_pair$previous)
   
-  # Find common columns between the two versions for comparison
-  # This handles cases where one version has paycode and the other doesn't
+  # Check if index column exists; if not, fall back to old method
+  if (!("index" %in% names(latest_mutated)) || !("index" %in% names(previous_mutated))) {
+    warning("Index column not found. Using fallback comparison method.")
+    return(.compare_legacy(df, latest_mutated, previous_mutated))
+  }
+  
+  # New simplified comparison using index column
+  # Join previous and latest on index to see what changed at each position
+  comparison <- dplyr::left_join(
+    previous_mutated %>% 
+      dplyr::rename(name_prev = name, role_prev = role) %>%
+      dplyr::mutate(name_prev = dplyr::if_else(name_prev == ".", NA_character_, name_prev)),
+    latest_mutated %>% 
+      dplyr::rename(name_latest = name, role_latest = role) %>%
+      dplyr::mutate(name_latest = dplyr::if_else(name_latest == ".", NA_character_, name_latest)),
+    by = c("index", "date", "day", "start", "end", "location", "week")
+  )
+  
+  # Identify changes by comparing names at each index
+  # Treat "." placeholder as NA (empty slot)
+  additions <- comparison %>%
+    dplyr::filter(is.na(name_prev) & !is.na(name_latest)) %>%
+    dplyr::select(date, day, start, end, location, name = name_latest, role = role_latest, week, index)
+  
+  removals <- comparison %>%
+    dplyr::filter(!is.na(name_prev) & is.na(name_latest)) %>%
+    dplyr::select(date, day, start, end, location, name = name_prev, role = role_prev, week, index)
+  
+  # Replacements: same position but different person (excluding placeholder dot)
+  replacements <- comparison %>%
+    dplyr::filter(!is.na(name_prev) & !is.na(name_latest) & name_prev != name_latest) %>%
+    dplyr::select(
+      date, day, start, end, location,
+      name_removed = name_prev, role_removed = role_prev,
+      name_added = name_latest, role_added = role_latest,
+      week, index
+    )
+  
+  # Detect swaps: two people exchange positions in the same lab/session
+  # A swap would show up as two replacements where names are exchanged
+  swaps <- NULL
+  if (nrow(replacements) > 0) {
+    # Identify swaps by grouping replacements on the same date, time, location
+    # If there are 2+ replacements in the same slot, it's likely a swap
+    swaps <- replacements %>%
+      dplyr::group_by(date, day, start, end, location, week) %>%
+      dplyr::filter(dplyr::n() >= 2) %>%
+      dplyr::ungroup()
+    
+    if (nrow(swaps) == 0) {
+      swaps <- NULL
+    }
+  }
+  
+  # Detect paycode changes: same position, same person, but different role
+  paycode_changes <- comparison %>%
+    dplyr::filter(!is.na(name_prev) & !is.na(name_latest) & 
+                    name_prev == name_latest & role_prev != role_latest) %>%
+    dplyr::select(
+      date, day, start, end, location, name = name_prev, week, index,
+      role_prev, role_latest
+    )
+  
+  if (nrow(paycode_changes) == 0) {
+    paycode_changes <- NULL
+  }
+  
+  # Return the changes and df
+  changes <- list(
+    additions = additions,
+    removals = removals,
+    replacements = replacements,
+    swaps = swaps,
+    paycode_changes = paycode_changes
+  )
+  
+  result <- list(changes = changes, df = df)
+  class(result) <- c("document_changes", "list")
+  return(result)
+}
+
+# Legacy comparison method for backwards compatibility
+.compare_legacy <- function(df, latest_mutated, previous_mutated) {
+  # Find common columns between the two versions
   common_join_cols <- intersect(names(latest_mutated), names(previous_mutated))
   
   # Detect additions: rows in latest but not in previous
@@ -80,68 +163,24 @@ compare <- function(df) {
   removals <- dplyr::anti_join(previous_mutated, latest_mutated, by = common_join_cols)
   
   # Detect replacements: slots where a person was removed and another added
-  # Use only the subset of columns that exclude paycode (if present) for replacement detection
   common_cols <- c("date", "day", "start", "end", "location", "role", "week")
   replacements <- dplyr::inner_join(removals, additions, by = common_cols, suffix = c("_removed", "_added"))
   
-  # Remove replacements from additions and removals to get pure additions/removals
+  # Remove replacements from additions and removals
   if (nrow(replacements) > 0) {
-    # Get the common columns between additions/removals (excluding paycode if present)
     add_remove_join_cols <- intersect(names(additions), common_cols)
-    
     replacements_add <- dplyr::select(replacements, all_of(common_cols), name = name_added)
     replacements_rem <- dplyr::select(replacements, all_of(common_cols), name = name_removed)
-    
-    # Use only common columns for anti_join to handle paycode differences
     additions <- dplyr::anti_join(additions, replacements_add, by = add_remove_join_cols)
     removals <- dplyr::anti_join(removals, replacements_rem, by = add_remove_join_cols)
   }
   
-  # Detect paycode changes: same person, same slot, but different role/paycode
-  # This happens when staff change their tutorial position (e.g., drop first tutorial → becomes Tutor instead of Tutor (repeat))
-  paycode_changes <- NULL
-  if ("paycode" %in% names(latest_mutated) && "paycode" %in% names(previous_mutated)) {
-    # Find rows with same date, day, start, end, location, name, week but different role
-    slot_cols <- c("date", "day", "start", "end", "location", "name", "week")
-    slot_matches <- dplyr::inner_join(
-      previous_mutated %>% dplyr::select(all_of(slot_cols), role_prev = role, paycode_prev = paycode),
-      latest_mutated %>% dplyr::select(all_of(slot_cols), role_latest = role, paycode_latest = paycode),
-      by = slot_cols
-    )
-    
-    # Filter to only rows where role/paycode actually changed
-    if (nrow(slot_matches) > 0) {
-      paycode_changes <- slot_matches %>%
-        dplyr::filter(role_prev != role_latest) %>%
-        dplyr::select(all_of(slot_cols), role_prev, role_latest, paycode_prev, paycode_latest)
-      
-      if (nrow(paycode_changes) == 0) {
-        paycode_changes <- NULL
-      } else {
-        # Remove paycode changes from additions and removals since they're already tracked
-        # Only use common columns for the anti_join to handle paycode column differences
-        slot_cols_with_role <- c("date", "day", "start", "end", "location", "name", "week", "role")
-        
-        removals_to_remove <- paycode_changes %>%
-          dplyr::select(all_of(slot_cols)) %>%
-          dplyr::mutate(role = paycode_changes$role_prev)
-        
-        additions_to_remove <- paycode_changes %>%
-          dplyr::select(all_of(slot_cols)) %>%
-          dplyr::mutate(role = paycode_changes$role_latest)
-        
-        removals <- dplyr::anti_join(removals, removals_to_remove, by = slot_cols_with_role)
-        additions <- dplyr::anti_join(additions, additions_to_remove, by = slot_cols_with_role)
-      }
-    }
-  }
-  
-  # Return the changes and df
   changes <- list(
     additions = additions,
     removals = removals,
     replacements = replacements,
-    paycode_changes = paycode_changes
+    swaps = NULL,
+    paycode_changes = NULL
   )
   
   result <- list(changes = changes, df = df)
@@ -150,4 +189,17 @@ compare <- function(df) {
 }
 
 # Suppress R CMD check notes for non-standard evaluation variables
-utils::globalVariables(c("name_added", "name_removed", "role", "paycode", "role_prev", "role_latest", "paycode_prev", "paycode_latest"))
+utils::globalVariables(c(
+  "name_added", 
+  "name_removed", 
+  "role", 
+  "paycode", 
+  "role_prev", 
+  "role_latest", 
+  "paycode_prev", 
+  "paycode_latest",
+  "name_prev",
+  "name_latest",
+  "index",
+  "n"
+))
