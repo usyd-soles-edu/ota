@@ -270,7 +270,13 @@ generate_html_summary <- function(all_changes,
                                   n_paycode_changes,
                                   file_path = NULL) {
   timestamp <- format(Sys.time(), "%Y-%m-%d-%H%M%S")
-  output_dir <- if (!is.null(file_path) && file_path != "") dirname(file_path) else "logs/html"
+  # Determine the logs/html directory based on where the roster file is located
+  if (!is.null(file_path) && file_path != "") {
+    base_dir <- dirname(file_path)
+    output_dir <- file.path(base_dir, "logs", "html")
+  } else {
+    output_dir <- file.path("logs", "html")
+  }
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
   filename <- sprintf("%s-changes-%s.html", unit, timestamp)
