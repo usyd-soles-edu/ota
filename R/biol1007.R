@@ -3,7 +3,7 @@
 #' This function handles roster processing specific to BIOL1007 unit.
 #'
 #' @param file_path Path to the Excel file containing the roster data.
-#' @return A dataframe in long format with columns: index, date, day, start, end, location, name, role, week.
+#' @return A dataframe in long format with columns: date, day, start, end, location, name, role, week.
 #' @importFrom readxl read_excel
 #' @importFrom dplyr %>% select all_of filter mutate across where na_if
 #'   case_when
@@ -63,7 +63,6 @@ roster_biol1007 <- function(file_path) {
       values_drop_na = TRUE
     ) %>%
     mutate(
-      index = row_number(),
       role = str_extract(role_loc, "^(Sup|Demo)"),
       role = case_when(
         role == "Sup" ~ "Tutor",
@@ -85,7 +84,7 @@ roster_biol1007 <- function(file_path) {
       ),
       week = as.integer(Week)
     ) %>%
-    select(index, date, day, start, end, location, name, role, week)
+    select(date, day, start, end, location, name, role, week)
   lgr::lgr$info("Reformatted the data into the required structure.")
 
   # Attach the file path and unit as attributes to the returned dataframe
