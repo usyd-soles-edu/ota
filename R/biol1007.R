@@ -3,7 +3,7 @@
 #' This function handles roster processing specific to BIOL1007 unit.
 #'
 #' @param file_path Path to the Excel file containing the roster data.
-#' @return A dataframe in long format with columns: date, day, start, end, location, name, role, week, activity.
+#' @return A dataframe in long format with columns: index, date, day, start, end, location, name, role, week.
 #' @importFrom readxl read_excel
 #' @importFrom dplyr %>% select all_of filter mutate across where na_if
 #'   case_when
@@ -54,9 +54,6 @@ roster_biol1007 <- function(file_path) {
   df <- df %>% filter(!is.na(Date))
   lgr::lgr$debug("Removed rows with missing dates.")
 
-  # Replace "." with NA
-  df <- df %>% mutate(across(where(is.character), ~ na_if(., ".")))
-
   # Pivot the Sup and Demo columns
   df_long <- df %>%
     pivot_longer(
@@ -66,6 +63,7 @@ roster_biol1007 <- function(file_path) {
       values_drop_na = TRUE
     ) %>%
     mutate(
+      index = row_number(),
       role = str_extract(role_loc, "^(Sup|Demo)"),
       role = case_when(
         role == "Sup" ~ "Tutor",
@@ -85,10 +83,9 @@ roster_biol1007 <- function(file_path) {
         str_detect(Session, "2-5pm") ~ "17:00",
         TRUE ~ NA_character_
       ),
-      week = as.integer(Week),
-      activity = .data$Practical,
+      week = as.integer(Week)
     ) %>%
-    select(date, day, start, end, location, name, role, week, activity)
+    select(index, date, day, start, end, location, name, role, week)
   lgr::lgr$info("Reformatted the data into the required structure.")
 
   # Attach the file path and unit as attributes to the returned dataframe
