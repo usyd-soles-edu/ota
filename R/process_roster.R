@@ -17,8 +17,9 @@ process_roster <- function(file_path, unit, add_paycodes = TRUE, compare = TRUE,
   # Load roster
   df <- roster(file_path, unit)
 
-  # Create snapshot
+  # Create snapshot and capture whether a new snapshot was created
   df <- snapshot(df, force = force_snapshot)
+  snapshot_created <- attr(df, "snapshot_created")
 
   # Optionally add paycodes
   if (add_paycodes) {
@@ -28,6 +29,8 @@ process_roster <- function(file_path, unit, add_paycodes = TRUE, compare = TRUE,
   # Optionally compare and summarize
   if (compare) {
     result <- compare(df)
+    # Pass the snapshot_created flag to the result
+    attr(result, "snapshot_created") <- snapshot_created
     if (summary) {
       summary(result, HTML = HTML)
     }

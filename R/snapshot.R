@@ -12,7 +12,9 @@
 #'   current roster differs from the latest snapshot. If \code{TRUE}, always saves 
 #'   a new snapshot regardless of changes.
 #'
-#' @return Invisibly returns the input dataframe, allowing for function chaining.
+#' @return Invisibly returns the input dataframe with an attribute `snapshot_created`
+#'   (logical) indicating whether a new snapshot was created (TRUE) or skipped due to 
+#'   no changes (FALSE), allowing for function chaining and downstream decisions.
 #'
 #' @details
 #' The function creates a \code{logs} subdirectory in the same directory as
@@ -89,9 +91,10 @@ snapshot <- function(df, force = FALSE) {
       
       if (nrow(diff1) == 0 && nrow(diff2) == 0) {
         message("No changes detected, skipping snapshot.")
-        # Restore attributes before returning
+        # Mark that no snapshot was created and restore attributes before returning
         attr(df, "file_path") <- file_path
         attr(df, "unit") <- unit
+        attr(df, "snapshot_created") <- FALSE
         return(invisible(df))
       }
     }
@@ -110,9 +113,10 @@ snapshot <- function(df, force = FALSE) {
   
   message("Snapshot saved to: ", csv_path)
   
-  # Restore attributes to the dataframe and return invisibly for chaining
+  # Restore attributes to the dataframe, marking that snapshot was created, and return invisibly
   attr(df, "file_path") <- file_path
   attr(df, "unit") <- unit
+  attr(df, "snapshot_created") <- TRUE
   
   invisible(df)
 }

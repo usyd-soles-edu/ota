@@ -11,6 +11,36 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   compare_result <- object
   changes <- compare_result$changes
   df <- compare_result$df
+  
+  # Check if snapshot was created; if not, skip showing the summary
+  snapshot_created <- attr(compare_result, "snapshot_created")
+  if (isFALSE(snapshot_created)) {
+    # No new snapshot created (no changes detected)
+    file_path <- attr(df, "file_path")
+    unit <- attr(df, "unit")
+    if (is.null(unit)) {
+      unit <- "unknown"
+    }
+    previous_html <- find_latest_html(unit, file_path)
+    
+    if (!is.null(previous_html)) {
+      # Get relative path if possible
+      rel_path <- tryCatch(
+        {
+          fs::path_rel(previous_html, getwd())
+        },
+        error = function(e) previous_html
+      )
+      cli::cat_line(cli::col_blue(sprintf("ℹ No new snapshot created (no changes detected).")))
+      cli::cat_line(cli::col_blue(sprintf("  Previous HTML summary: %s", rel_path)))
+      cli::cat_line()
+    } else {
+      cli::cat_line(cli::col_blue(sprintf("ℹ No new snapshot created (no changes detected).")))
+      cli::cat_line(cli::col_blue(sprintf("  No previous HTML summary found.")))
+      cli::cat_line()
+    }
+    return(invisible(df))
+  }
 
   if (is.null(changes)) {
     return(invisible(df))
@@ -228,35 +258,72 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   }
   cli::cat_line()
 
-  # Generate HTML if requested
+  # Check if a new snapshot was created
+  snapshot_created <- attr(compare_result, "snapshot_created")
+  
+  # Generate HTML only if a new snapshot was created
   if (HTML) {
-    file_path <- attr(df, "file_path")
-    html_file <- generate_html_summary(
-      all_changes,
-      unit,
-      total_changes,
-      n_additions,
-      n_removals,
-      n_replacements,
-      n_swaps,
-      n_paycode_changes,
-      file_path
-    )
-    cli::cat_line(cli::col_green(sprintf("✓ HTML summary saved: %s", html_file)))
-    cli::cat_line()
+    if (isTRUE(snapshot_created)) {
+      # New snapshot created, generate new HTML
+      file_path <- attr(df, "file_path")
+      html_file <- generate_html_summary(
+        all_changes,
+        unit,
+        total_changes,
+        n_additions,
+        n_removals,
+        n_replacements,
+        n_swaps,
+        n_paycode_changes,
+        file_path
+      )
+      cli::cat_line(cli::col_green(sprintf("✓ HTML summary saved: %s", html_file)))
+      cli::cat_line()
 
-    # Open in RStudio viewer pane
-    if (rlang::is_installed("rstudioapi") &&
-        rstudioapi::isAvailable()) {
-      rstudioapi::viewer(html_file)
-    } else {
-      # Fallback to browser if RStudio not available
-      utils::browseURL(html_file)
+      # Open in RStudio viewer pane
+      if (rlang::is_installed("rstudioapi") &&
+          rstudioapi::isAvailable()) {
+        rstudioapi::viewer(html_file)
+      } else {
+        # Fallback to browser if RStudio not available
+        utils::browseURL(html_file)
+      }
     }
   }
 
   # Return the dataframe invisibly
   invisible(df)
+}
+
+# Helper function to find the latest HTML file for a unit
+find_latest_html <- function(unit, file_path = NULL) {
+  # Determine the logs/html directory
+  if (!is.null(file_path) && file_path != "") {
+    base_dir <- dirname(file_path)
+    html_dir <- file.path(base_dir, "logs", "html")
+  } else {
+    html_dir <- file.path("logs", "html")
+  }
+  
+  # Check if directory exists
+  if (!dir.exists(html_dir)) {
+    return(NULL)
+  }
+  
+  # Find all HTML files for this unit
+  html_files <- list.files(
+    html_dir, 
+    pattern = sprintf("^%s-changes-.*\\.html$", unit),
+    full.names = TRUE
+  )
+  
+  if (length(html_files) == 0) {
+    return(NULL)
+  }
+  
+  # Return the most recent file
+  html_files <- sort(html_files)
+  return(html_files[length(html_files)])
 }
 
 # Helper function to generate HTML with table only

@@ -148,6 +148,12 @@ compare <- function(df) {
   
   result <- list(changes = changes, df = df)
   class(result) <- c("document_changes", "list")
+  
+  # Preserve the snapshot_created attribute if it exists
+  if (!is.null(attr(df, "snapshot_created"))) {
+    attr(result, "snapshot_created") <- attr(df, "snapshot_created")
+  }
+  
   return(result)
 }
 
