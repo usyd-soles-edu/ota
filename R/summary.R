@@ -5,7 +5,7 @@
 #' @param ... Additional arguments (ignored).
 #' @return Invisibly returns the input dataframe.
 #' @importFrom dplyr bind_rows arrange select mutate
-#' @importFrom cli style_strikethrough style_bold ansi_nchar ansi_strip col_green col_red cat_line
+#' @importFrom cli style_strikethrough style_bold ansi_nchar ansi_strip col_green col_red col_blue cat_line
 #' @export
 summary.document_changes <- function(object, HTML = FALSE, ...) {
   compare_result <- object
@@ -221,12 +221,12 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
         type = "Paycode change",
         before = sprintf(
           "%s (%s)",
-          cli::style_bold(cli::col_blue(name)),
+          cli::style_bold(cli::col_red(name)),
           paycode_prev
         ),
         after = sprintf(
           "%s (%s)",
-          cli::style_bold(cli::col_blue(name)),
+          cli::style_bold(cli::col_green(name)),
           paycode_latest
         )
       ) %>%
