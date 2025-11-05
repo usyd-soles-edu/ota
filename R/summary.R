@@ -102,7 +102,11 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       dplyr::mutate(
         type = "Addition",
         before = "",
-        after = sprintf("%s - %s", cli::style_bold(cli::col_green(name)), role)
+        after = sprintf(
+          "%s (%s)",
+          cli::style_bold(cli::col_green(name)),
+          paycode
+        )
       ) %>%
       dplyr::select(
         date,
@@ -119,7 +123,11 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
     removals %>%
       dplyr::mutate(
         type = "Removal",
-        before = sprintf("%s - %s", cli::style_bold(cli::col_red(name)), role),
+        before = sprintf(
+          "%s (%s)",
+          cli::style_bold(cli::col_red(name)),
+          paycode
+        ),
         after = ""
       ) %>%
       dplyr::select(
@@ -138,14 +146,14 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       dplyr::mutate(
         type = "Replacement",
         before = sprintf(
-          "%s - %s",
+          "%s (%s)",
           cli::style_bold(cli::col_red(name_removed)),
-          role_removed
+          paycode_removed
         ),
         after = sprintf(
-          "%s - %s",
+          "%s (%s)",
           cli::style_bold(cli::col_green(name_added)),
-          role_added
+          paycode_added
         )
       ) %>%
       dplyr::select(
@@ -164,31 +172,31 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
 
   # Add swaps if they exist
   if (!is.null(swaps) && nrow(swaps) > 0) {
-    # For swaps, we show both people involved with their roles
-    # Note: name_removed/role_removed is person at position before swap
-    #       name_added/role_added is person at that same position after swap
-    # So after swap: name_added has role_added, and name_removed has role_added's old role
-    # We need to find what role name_removed has after the swap
-    # Since both people swapped positions, name_removed now has role_added's previous role
+    # For swaps, we show both people involved with their paycode
+    # Note: name_removed/paycode_removed is person at position before swap
+    #       name_added/paycode_added is person at that same position after swap
+    # So after swap: name_added has paycode_added, and name_removed has paycode_added's old paycode
+    # We need to find what paycode name_removed has after the swap
+    # Since both people swapped positions, name_removed now has paycode_added's previous paycode
     swaps_formatted <- swaps %>%
       dplyr::mutate(
         type = "Swap",
         before = sprintf(
-          "%s - %s / %s - %s",
+          "%s (%s) / %s (%s)",
           cli::style_bold(cli::col_blue(name_removed)),
-          role_removed,
+          paycode_removed,
           cli::style_bold(cli::col_blue(name_added)),
-          role_added
+          paycode_added
         ),
         # After swap: positions swapped, so each person is at the other's position
-        # name_removed is now at the position that had role_added, so gets role_added
-        # name_added is now at the position that had role_removed, so gets role_removed
+        # name_removed is now at the position that had paycode_added, so gets paycode_added
+        # name_added is now at the position that had paycode_removed, so gets paycode_removed
         after = sprintf(
-          "%s - %s / %s - %s",
+          "%s (%s) / %s (%s)",
           cli::style_bold(cli::col_blue(name_removed)),
-          role_added,
+          paycode_added,
           cli::style_bold(cli::col_blue(name_added)),
-          role_removed
+          paycode_removed
         )
       ) %>%
       dplyr::select(
@@ -212,14 +220,14 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       dplyr::mutate(
         type = "Paycode change",
         before = sprintf(
-          "%s - %s",
+          "%s (%s)",
           cli::style_bold(cli::col_blue(name)),
-          role_prev
+          paycode_prev
         ),
         after = sprintf(
-          "%s - %s",
+          "%s (%s)",
           cli::style_bold(cli::col_blue(name)),
-          role_latest
+          paycode_latest
         )
       ) %>%
       dplyr::select(
@@ -564,12 +572,17 @@ utils::globalVariables(
   c(
     "name",
     "role",
+    "paycode",
     "name_removed",
     "name_added",
     "role_prev",
     "role_latest",
     "role_added",
     "role_removed",
+    "paycode_prev",
+    "paycode_latest",
+    "paycode_removed",
+    "paycode_added",
     "location",
     "week",
     "type",

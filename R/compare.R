@@ -83,12 +83,20 @@ compare <- function(df) {
   # Join previous and latest on index to see what changed at each position
   comparison <- dplyr::left_join(
     previous_mutated %>%
-      dplyr::rename(name_prev = name, role_prev = role) %>%
+      dplyr::rename(
+        name_prev = name,
+        role_prev = role,
+        paycode_prev = paycode
+      ) %>%
       dplyr::mutate(
         name_prev = dplyr::if_else(name_prev == ".", NA_character_, name_prev)
       ),
     latest_mutated %>%
-      dplyr::rename(name_latest = name, role_latest = role) %>%
+      dplyr::rename(
+        name_latest = name,
+        role_latest = role,
+        paycode_latest = paycode
+      ) %>%
       dplyr::mutate(
         name_latest = dplyr::if_else(
           name_latest == ".",
@@ -111,6 +119,7 @@ compare <- function(df) {
       location,
       name = name_latest,
       role = role_latest,
+      paycode = paycode_latest,
       week,
       index
     )
@@ -125,6 +134,7 @@ compare <- function(df) {
       location,
       name = name_prev,
       role = role_prev,
+      paycode = paycode_prev,
       week,
       index
     )
@@ -142,8 +152,10 @@ compare <- function(df) {
       location,
       name_removed = name_prev,
       role_removed = role_prev,
+      paycode_removed = paycode_prev,
       name_added = name_latest,
       role_added = role_latest,
+      paycode_added = paycode_latest,
       week,
       index
     )
@@ -186,6 +198,7 @@ compare <- function(df) {
           # r2$name_removed (Shahnoosh) has r1$role_removed (Demonstrator)
           swap_record <- r1
           swap_record$role_added <- r2$role_removed # Anita's new role is Shahnoosh's old role
+          swap_record$paycode_added <- r2$paycode_removed # Anita's new paycode is Shahnoosh's old paycode
 
           if (is.null(swaps)) {
             swaps <- swap_record
@@ -224,7 +237,9 @@ compare <- function(df) {
       week,
       index,
       role_prev,
-      role_latest
+      role_latest,
+      paycode_prev,
+      paycode_latest
     )
 
   if (nrow(paycode_changes) == 0) {

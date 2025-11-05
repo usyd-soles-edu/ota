@@ -10,7 +10,7 @@
 #' @return A list with elements:
 #'   \item{latest}{Dataframe of the most recent log file}
 #'   \item{previous}{Dataframe of the second-most recent log file}
-#'   
+#'
 #'   Returns \code{NULL} if fewer than 2 log files exist for the unit. This
 #'   ensures \code{compare()} can only execute when there are two snapshots
 #'   to compare.
@@ -29,20 +29,24 @@
 #' @keywords internal
 .latest_pair <- function(unit, logs_dir) {
   # List existing log files for this unit
-  log_files <- list.files(logs_dir, pattern = paste0(unit, "-.*\\.csv$"), full.names = TRUE)
-  
+  log_files <- list.files(
+    logs_dir,
+    pattern = paste0(unit, "-.*\\.csv$"),
+    full.names = TRUE
+  )
+
   if (length(log_files) < 2) {
     return(NULL)
   }
-  
+
   # Sort log files by name (timestamp)
   sorted_logs <- sort(log_files)
   n <- length(sorted_logs)
-  
+
   # Read the two latest log files
   latest_log <- sorted_logs[n]
   previous_log <- sorted_logs[n - 1]
-  
+
   latest_df <- readr::read_csv(
     latest_log,
     col_types = readr::cols(
@@ -53,11 +57,13 @@
       location = readr::col_character(),
       name = readr::col_character(),
       role = readr::col_character(),
-      week = readr::col_integer()
+      week = readr::col_integer(),
+      index = readr::col_character(),
+      paycode = readr::col_character()
     ),
     show_col_types = FALSE
   )
-  
+
   previous_df <- readr::read_csv(
     previous_log,
     col_types = readr::cols(
@@ -68,10 +74,12 @@
       location = readr::col_character(),
       name = readr::col_character(),
       role = readr::col_character(),
-      week = readr::col_integer()
+      week = readr::col_integer(),
+      index = readr::col_character(),
+      paycode = readr::col_character()
     ),
     show_col_types = FALSE
   )
-  
+
   return(list(latest = latest_df, previous = previous_df))
 }
