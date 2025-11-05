@@ -11,6 +11,36 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   compare_result <- object
   changes <- compare_result$changes
   df <- compare_result$df
+  
+  # Check if snapshot was created; if not, skip showing the summary
+  snapshot_created <- attr(compare_result, "snapshot_created")
+  if (isFALSE(snapshot_created)) {
+    # No new snapshot created (no changes detected)
+    file_path <- attr(df, "file_path")
+    unit <- attr(df, "unit")
+    if (is.null(unit)) {
+      unit <- "unknown"
+    }
+    previous_html <- find_latest_html(unit, file_path)
+    
+    if (!is.null(previous_html)) {
+      # Get relative path if possible
+      rel_path <- tryCatch(
+        {
+          fs::path_rel(previous_html, getwd())
+        },
+        error = function(e) previous_html
+      )
+      cli::cat_line(cli::col_blue(sprintf("ℹ No new snapshot created (no changes detected).")))
+      cli::cat_line(cli::col_blue(sprintf("  Previous HTML summary: %s", rel_path)))
+      cli::cat_line()
+    } else {
+      cli::cat_line(cli::col_blue(sprintf("ℹ No new snapshot created (no changes detected).")))
+      cli::cat_line(cli::col_blue(sprintf("  No previous HTML summary found.")))
+      cli::cat_line()
+    }
+    return(invisible(df))
+  }
 
   if (is.null(changes)) {
     return(invisible(df))
@@ -25,13 +55,16 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   additions <- changes$additions
   removals <- changes$removals
   replacements <- changes$replacements
+  swaps <- changes$swaps
   paycode_changes <- changes$paycode_changes
 
   # Calculate totals
-  total_changes <- nrow(additions) + nrow(removals) + nrow(replacements)
+  total_changes <- nrow(additions) + nrow(removals) + nrow(replacements) + 
+    (if (is.null(swaps)) 0 else nrow(swaps))
   n_additions <- nrow(additions)
   n_removals <- nrow(removals)
   n_replacements <- nrow(replacements)
+  n_swaps <- if (is.null(swaps)) 0 else nrow(swaps)
   n_paycode_changes <- if (is.null(paycode_changes))
     0
   else
@@ -62,10 +95,32 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
         "%s → %s - %s",
         cli::style_strikethrough(cli::col_red(name_removed)),
         cli::style_bold(cli::col_green(name_added)),
-        role
-      )
-    )
+        role_added
+      ),
+      role = role_added
+    ) %>%
+      dplyr::select(date, day, start, end, location, name = name_added, role, week, type, details)
   )
+
+  # Add swaps if they exist
+  if (!is.null(swaps) && nrow(swaps) > 0) {
+    # For swaps, we show both people involved
+    swaps_formatted <- swaps %>%
+      dplyr::mutate(
+        type = "Swap",
+        details = sprintf(
+          "%s ↔ %s (roles: %s ↔ %s)",
+          cli::style_bold(cli::col_blue(name_removed)),
+          cli::style_bold(cli::col_blue(name_added)),
+          role_removed,
+          role_added
+        ),
+        role = role_added,
+        name = paste(name_removed, "↔", name_added)
+      ) %>%
+      dplyr::select(date, day, start, end, location, name, role, week, type, details, index)
+    change_list <- append(change_list, list(swaps_formatted))
+  }
 
   # Add paycode changes if they exist
   if (!is.null(paycode_changes) && nrow(paycode_changes) > 0) {
@@ -86,10 +141,11 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
                     end,
                     location,
                     name,
+                    role,
                     week,
                     type,
                     details,
-                    role)
+                    index)
     change_list <- append(change_list, list(paycode_changes_formatted))
   }
 
@@ -152,11 +208,12 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   cli::cat_line("======================")
   cli::cat_line(
     sprintf(
-      "Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d  | Paycode changes: %2d",
+      "Total changes: %2d  | Additions: %2d  | Removals: %2d  | Replacements: %2d  | Swaps: %2d  | Paycode changes: %2d",
       total_changes,
       n_additions,
       n_removals,
       n_replacements,
+      n_swaps,
       n_paycode_changes
     )
   )
@@ -201,34 +258,72 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   }
   cli::cat_line()
 
-  # Generate HTML if requested
+  # Check if a new snapshot was created
+  snapshot_created <- attr(compare_result, "snapshot_created")
+  
+  # Generate HTML only if a new snapshot was created
   if (HTML) {
-    file_path <- attr(df, "file_path")
-    html_file <- generate_html_summary(
-      all_changes,
-      unit,
-      total_changes,
-      n_additions,
-      n_removals,
-      n_replacements,
-      n_paycode_changes,
-      file_path
-    )
-    cli::cat_line(cli::col_green(sprintf("✓ HTML summary saved: %s", html_file)))
-    cli::cat_line()
+    if (isTRUE(snapshot_created)) {
+      # New snapshot created, generate new HTML
+      file_path <- attr(df, "file_path")
+      html_file <- generate_html_summary(
+        all_changes,
+        unit,
+        total_changes,
+        n_additions,
+        n_removals,
+        n_replacements,
+        n_swaps,
+        n_paycode_changes,
+        file_path
+      )
+      cli::cat_line(cli::col_green(sprintf("✓ HTML summary saved: %s", html_file)))
+      cli::cat_line()
 
-    # Open in RStudio viewer pane
-    if (rlang::is_installed("rstudioapi") &&
-        rstudioapi::isAvailable()) {
-      rstudioapi::viewer(html_file)
-    } else {
-      # Fallback to browser if RStudio not available
-      utils::browseURL(html_file)
+      # Open in RStudio viewer pane
+      if (rlang::is_installed("rstudioapi") &&
+          rstudioapi::isAvailable()) {
+        rstudioapi::viewer(html_file)
+      } else {
+        # Fallback to browser if RStudio not available
+        utils::browseURL(html_file)
+      }
     }
   }
 
   # Return the dataframe invisibly
   invisible(df)
+}
+
+# Helper function to find the latest HTML file for a unit
+find_latest_html <- function(unit, file_path = NULL) {
+  # Determine the logs/html directory
+  if (!is.null(file_path) && file_path != "") {
+    base_dir <- dirname(file_path)
+    html_dir <- file.path(base_dir, "logs", "html")
+  } else {
+    html_dir <- file.path("logs", "html")
+  }
+  
+  # Check if directory exists
+  if (!dir.exists(html_dir)) {
+    return(NULL)
+  }
+  
+  # Find all HTML files for this unit
+  html_files <- list.files(
+    html_dir, 
+    pattern = sprintf("^%s-changes-.*\\.html$", unit),
+    full.names = TRUE
+  )
+  
+  if (length(html_files) == 0) {
+    return(NULL)
+  }
+  
+  # Return the most recent file
+  html_files <- sort(html_files)
+  return(html_files[length(html_files)])
 }
 
 # Helper function to generate HTML with table only
@@ -238,10 +333,17 @@ generate_html_summary <- function(all_changes,
                                   n_additions,
                                   n_removals,
                                   n_replacements,
+                                  n_swaps,
                                   n_paycode_changes,
                                   file_path = NULL) {
   timestamp <- format(Sys.time(), "%Y-%m-%d-%H%M%S")
-  output_dir <- if (!is.null(file_path) && file_path != "") dirname(file_path) else "logs/html"
+  # Determine the logs/html directory based on where the roster file is located
+  if (!is.null(file_path) && file_path != "") {
+    base_dir <- dirname(file_path)
+    output_dir <- file.path(base_dir, "logs", "html")
+  } else {
+    output_dir <- file.path("logs", "html")
+  }
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
   filename <- sprintf("%s-changes-%s.html", unit, timestamp)
@@ -357,6 +459,8 @@ utils::globalVariables(
     "name_added",
     "role_prev",
     "role_latest",
+    "role_added",
+    "role_removed",
     "location",
     "week",
     "type",
@@ -364,6 +468,8 @@ utils::globalVariables(
     "date",
     "day",
     "start",
-    "end"
+    "end",
+    "index",
+    "n"
   )
 )
