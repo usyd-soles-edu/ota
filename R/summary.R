@@ -11,7 +11,7 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   compare_result <- object
   changes <- compare_result$changes
   df <- compare_result$df
-  
+
   # Check if snapshot was created; if not, skip showing the summary
   snapshot_created <- attr(compare_result, "snapshot_created")
   if (isFALSE(snapshot_created)) {
@@ -22,7 +22,7 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       unit <- "unknown"
     }
     previous_html <- find_latest_html(unit, file_path)
-    
+
     if (!is.null(previous_html)) {
       # Get relative path if possible
       rel_path <- tryCatch(
@@ -31,11 +31,18 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
         },
         error = function(e) previous_html
       )
-      cli::cat_line(cli::col_blue(sprintf("ℹ No new snapshot created (no changes detected).")))
-      cli::cat_line(cli::col_blue(sprintf("  Previous HTML summary: %s", rel_path)))
+      cli::cat_line(cli::col_blue(sprintf(
+        "ℹ No new snapshot created (no changes detected)."
+      )))
+      cli::cat_line(cli::col_blue(sprintf(
+        "  Previous HTML summary: %s",
+        rel_path
+      )))
       cli::cat_line()
     } else {
-      cli::cat_line(cli::col_blue(sprintf("ℹ No new snapshot created (no changes detected).")))
+      cli::cat_line(cli::col_blue(sprintf(
+        "ℹ No new snapshot created (no changes detected)."
+      )))
       cli::cat_line(cli::col_blue(sprintf("  No previous HTML summary found.")))
       cli::cat_line()
     }
@@ -59,66 +66,143 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
   paycode_changes <- changes$paycode_changes
 
   # Calculate totals
-  total_changes <- nrow(additions) + nrow(removals) + nrow(replacements) + 
+  total_changes <- nrow(additions) +
+    nrow(removals) +
+    nrow(replacements) +
     (if (is.null(swaps)) 0 else nrow(swaps))
   n_additions <- nrow(additions)
   n_removals <- nrow(removals)
   n_replacements <- nrow(replacements)
   n_swaps <- if (is.null(swaps)) 0 else nrow(swaps)
-  n_paycode_changes <- if (is.null(paycode_changes))
+  n_paycode_changes <- if (is.null(paycode_changes)) {
     0
-  else
+  } else {
     nrow(paycode_changes)
+  }
 
   # Function to format activity (shared with HTML generation)
   format_activity <- function(row) {
     week_str <- sprintf("Wk%d", row$week)
-    day_abbr <- substr(row$day, 1, 3)  # Mon, Tue, etc.
+    day_abbr <- substr(row$day, 1, 3) # Mon, Tue, etc.
     start_conv <- convert_time_12h(row$start)
     end_conv <- convert_time_12h(row$end)
-    sprintf("%s - Lab %s %s %s-%s", week_str, row$location, day_abbr, start_conv, end_conv)
+    sprintf(
+      "%s - Lab %s %s %s-%s",
+      week_str,
+      row$location,
+      day_abbr,
+      start_conv,
+      end_conv
+    )
   }
 
   # Collect all changes into one data frame
   change_list <- list(
-    additions %>% dplyr::mutate(
-      type = "Addition",
-      details = sprintf("%s - %s", cli::style_bold(cli::col_green(name)), role)
-    ),
-    removals %>% dplyr::mutate(
-      type = "Removal",
-      details = sprintf("%s - %s", cli::style_bold(cli::col_red(name)), role)
-    ),
-    replacements %>% dplyr::mutate(
-      type = "Replacement",
-      details = sprintf(
-        "%s → %s - %s",
-        cli::style_strikethrough(cli::col_red(name_removed)),
-        cli::style_bold(cli::col_green(name_added)),
-        role_added
+    additions %>%
+      dplyr::mutate(
+        type = "Addition",
+        before = "",
+        after = sprintf("%s - %s", cli::style_bold(cli::col_green(name)), role)
+      ) %>%
+      dplyr::select(
+        date,
+        day,
+        start,
+        end,
+        location,
+        week,
+        type,
+        before,
+        after,
+        index
       ),
-      role = role_added
-    ) %>%
-      dplyr::select(date, day, start, end, location, name = name_added, role, week, type, details)
+    removals %>%
+      dplyr::mutate(
+        type = "Removal",
+        before = sprintf("%s - %s", cli::style_bold(cli::col_red(name)), role),
+        after = ""
+      ) %>%
+      dplyr::select(
+        date,
+        day,
+        start,
+        end,
+        location,
+        week,
+        type,
+        before,
+        after,
+        index
+      ),
+    replacements %>%
+      dplyr::mutate(
+        type = "Replacement",
+        before = sprintf(
+          "%s - %s",
+          cli::style_bold(cli::col_red(name_removed)),
+          role_removed
+        ),
+        after = sprintf(
+          "%s - %s",
+          cli::style_bold(cli::col_green(name_added)),
+          role_added
+        )
+      ) %>%
+      dplyr::select(
+        date,
+        day,
+        start,
+        end,
+        location,
+        week,
+        type,
+        before,
+        after,
+        index
+      )
   )
 
   # Add swaps if they exist
   if (!is.null(swaps) && nrow(swaps) > 0) {
-    # For swaps, we show both people involved
+    # For swaps, we show both people involved with their roles
+    # Note: name_removed/role_removed is person at position before swap
+    #       name_added/role_added is person at that same position after swap
+    # So after swap: name_added has role_added, and name_removed has role_added's old role
+    # We need to find what role name_removed has after the swap
+    # Since both people swapped positions, name_removed now has role_added's previous role
     swaps_formatted <- swaps %>%
       dplyr::mutate(
         type = "Swap",
-        details = sprintf(
-          "%s ↔ %s (roles: %s ↔ %s)",
+        before = sprintf(
+          "%s - %s / %s - %s",
           cli::style_bold(cli::col_blue(name_removed)),
-          cli::style_bold(cli::col_blue(name_added)),
           role_removed,
+          cli::style_bold(cli::col_blue(name_added)),
           role_added
         ),
-        role = role_added,
-        name = paste(name_removed, "↔", name_added)
+        # After swap: positions swapped, so each person is at the other's position
+        # name_removed is now at the position that had role_added, so gets role_added
+        # name_added is now at the position that had role_removed, so gets role_removed
+        after = sprintf(
+          "%s - %s / %s - %s",
+          cli::style_bold(cli::col_blue(name_removed)),
+          role_added,
+          cli::style_bold(cli::col_blue(name_added)),
+          role_removed
+        )
       ) %>%
-      dplyr::select(date, day, start, end, location, name, role, week, type, details, index)
+      dplyr::select(
+        date,
+        day,
+        start,
+        end,
+        location,
+        week,
+        type,
+        before,
+        after,
+        index
+      )
     change_list <- append(change_list, list(swaps_formatted))
   }
 
@@ -127,25 +211,29 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
     paycode_changes_formatted <- paycode_changes %>%
       dplyr::mutate(
         type = "Paycode change",
-        details = sprintf(
-          "%s - %s → %s",
-          cli::style_bold(cli::col_green(name)),
-          cli::style_strikethrough(cli::col_red(role_prev)),
-          cli::style_bold(cli::col_green(role_latest))
+        before = sprintf(
+          "%s - %s",
+          cli::style_bold(cli::col_blue(name)),
+          role_prev
         ),
-        role = role_latest
+        after = sprintf(
+          "%s - %s",
+          cli::style_bold(cli::col_blue(name)),
+          role_latest
+        )
       ) %>%
-      dplyr::select(date,
-                    day,
-                    start,
-                    end,
-                    location,
-                    name,
-                    role,
-                    week,
-                    type,
-                    details,
-                    index)
+      dplyr::select(
+        date,
+        day,
+        start,
+        end,
+        location,
+        week,
+        type,
+        before,
+        after,
+        index
+      )
     change_list <- append(change_list, list(paycode_changes_formatted))
   }
 
@@ -166,7 +254,8 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
     list(
       date = date_str,
       type = row$type,
-      details = row$details,
+      before = row$before,
+      after = row$after,
       activity = activity,
       row_data = row
     )
@@ -174,23 +263,34 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
 
   # Compute max widths based on visible characters
   col_widths <- c(
-    Date = max(sapply(rows, function(r)
-      nchar(r$date))),
-    Type = max(sapply(rows, function(r)
-      nchar(r$type))),
-    Details = max(sapply(rows, function(r)
-      nchar(cli::ansi_strip(r$details)))),
-    Activity = max(sapply(rows, function(r)
-      nchar(cli::ansi_strip(r$activity))))
+    Date = max(sapply(rows, function(r) {
+      nchar(r$date)
+    })),
+    Type = max(sapply(rows, function(r) {
+      nchar(r$type)
+    })),
+    Before = max(sapply(rows, function(r) {
+      nchar(cli::ansi_strip(r$before))
+    })),
+    After = max(sapply(rows, function(r) {
+      nchar(cli::ansi_strip(r$after))
+    })),
+    Activity = max(sapply(rows, function(r) {
+      nchar(cli::ansi_strip(r$activity))
+    }))
   )
 
   # Ensure minimum widths
-  col_widths <- pmax(col_widths, c(
-    Date = 10,
-    Type = 12,
-    Details = 20,
-    Activity = 15
-  ))
+  col_widths <- pmax(
+    col_widths,
+    c(
+      Date = 10,
+      Type = 12,
+      Before = 20,
+      After = 20,
+      Activity = 15
+    )
+  )
 
   # Function to pad strings properly accounting for ANSI codes
   pad_string <- function(text, width) {
@@ -225,7 +325,9 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
     " | ",
     pad_string("Type", col_widths["Type"]),
     " | ",
-    pad_string("Details", col_widths["Details"]),
+    pad_string("Before", col_widths["Before"]),
+    " | ",
+    pad_string("After", col_widths["After"]),
     " | ",
     pad_string("Activity", col_widths["Activity"])
   )
@@ -237,7 +339,9 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
     "-|-",
     strrep("-", col_widths["Type"]),
     "-|-",
-    strrep("-", col_widths["Details"]),
+    strrep("-", col_widths["Before"]),
+    "-|-",
+    strrep("-", col_widths["After"]),
     "-|-",
     strrep("-", col_widths["Activity"])
   )
@@ -250,7 +354,9 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
       " | ",
       pad_string(r$type, col_widths["Type"]),
       " | ",
-      pad_string(r$details, col_widths["Details"]),
+      pad_string(r$before, col_widths["Before"]),
+      " | ",
+      pad_string(r$after, col_widths["After"]),
       " | ",
       pad_string(r$activity, col_widths["Activity"])
     )
@@ -260,7 +366,7 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
 
   # Check if a new snapshot was created
   snapshot_created <- attr(compare_result, "snapshot_created")
-  
+
   # Generate HTML only if a new snapshot was created
   if (HTML) {
     if (isTRUE(snapshot_created)) {
@@ -277,12 +383,17 @@ summary.document_changes <- function(object, HTML = FALSE, ...) {
         n_paycode_changes,
         file_path
       )
-      cli::cat_line(cli::col_green(sprintf("✓ HTML summary saved: %s", html_file)))
+      cli::cat_line(cli::col_green(sprintf(
+        "✓ HTML summary saved: %s",
+        html_file
+      )))
       cli::cat_line()
 
       # Open in RStudio viewer pane
-      if (rlang::is_installed("rstudioapi") &&
-          rstudioapi::isAvailable()) {
+      if (
+        rlang::is_installed("rstudioapi") &&
+          rstudioapi::isAvailable()
+      ) {
         rstudioapi::viewer(html_file)
       } else {
         # Fallback to browser if RStudio not available
@@ -304,38 +415,40 @@ find_latest_html <- function(unit, file_path = NULL) {
   } else {
     html_dir <- file.path("logs", "html")
   }
-  
+
   # Check if directory exists
   if (!dir.exists(html_dir)) {
     return(NULL)
   }
-  
+
   # Find all HTML files for this unit
   html_files <- list.files(
-    html_dir, 
+    html_dir,
     pattern = sprintf("^%s-changes-.*\\.html$", unit),
     full.names = TRUE
   )
-  
+
   if (length(html_files) == 0) {
     return(NULL)
   }
-  
+
   # Return the most recent file
   html_files <- sort(html_files)
   return(html_files[length(html_files)])
 }
 
 # Helper function to generate HTML with table only
-generate_html_summary <- function(all_changes,
-                                  unit,
-                                  total_changes,
-                                  n_additions,
-                                  n_removals,
-                                  n_replacements,
-                                  n_swaps,
-                                  n_paycode_changes,
-                                  file_path = NULL) {
+generate_html_summary <- function(
+  all_changes,
+  unit,
+  total_changes,
+  n_additions,
+  n_removals,
+  n_replacements,
+  n_swaps,
+  n_paycode_changes,
+  file_path = NULL
+) {
   timestamp <- format(Sys.time(), "%Y-%m-%d-%H%M%S")
   # Determine the logs/html directory based on where the roster file is located
   if (!is.null(file_path) && file_path != "") {
@@ -344,8 +457,10 @@ generate_html_summary <- function(all_changes,
   } else {
     output_dir <- file.path("logs", "html")
   }
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+
   filename <- sprintf("%s-changes-%s.html", unit, timestamp)
   filepath <- file.path(output_dir, filename)
 
@@ -358,13 +473,28 @@ generate_html_summary <- function(all_changes,
     day_abbr <- substr(row$day, 1, 3)
     start_conv <- convert_time_12h(row$start)
     end_conv <- convert_time_12h(row$end)
-    activity <- sprintf("%s - Lab %s %s %s-%s", week_str, row$location, day_abbr, start_conv, end_conv)
-    details_html <- format_details_html(row$type, row$details)
-    
-    table_rows <- c(table_rows, sprintf(
-      "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-      date_str, row$type, details_html, activity
-    ))
+    activity <- sprintf(
+      "%s - Lab %s %s %s-%s",
+      week_str,
+      row$location,
+      day_abbr,
+      start_conv,
+      end_conv
+    )
+    before_html <- format_state_html(row$before)
+    after_html <- format_state_html(row$after)
+
+    table_rows <- c(
+      table_rows,
+      sprintf(
+        "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+        date_str,
+        row$type,
+        before_html,
+        after_html,
+        activity
+      )
+    )
   }
   table_rows <- c(table_rows, "</tbody>")
 
@@ -384,7 +514,7 @@ generate_html_summary <- function(all_changes,
     "</style>",
     "</head><body>",
     "<table>",
-    "<thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Activity</th></tr></thead>",
+    "<thead><tr><th>Date</th><th>Type</th><th>Before</th><th>After</th><th>Activity</th></tr></thead>",
     table_rows,
     "</table>",
     "</body></html>"
@@ -394,60 +524,39 @@ generate_html_summary <- function(all_changes,
   filepath
 }
 
-# Helper function to format details text with HTML styling
-format_details_html <- function(type, details_text) {
+# Helper function to format state text with HTML styling (for before/after)
+format_state_html <- function(state_text) {
   # Strip ANSI codes first
-  clean_text <- cli::ansi_strip(details_text)
-  
-  if (type == "Addition") {
-    # Format: Name - Role
-    return(sprintf("<span class=\"text-success\">%s</span>", clean_text))
-  } else if (type == "Removal") {
-    # Format: Name - Role
-    return(sprintf("<span class=\"text-danger\">%s</span>", clean_text))
-  } else if (type == "Replacement") {
-    # Format: OldName → NewName - Role
-    # Use regex to split on arrow and extract components
-    arrow_pattern <- "^(.+?) → (.+?) - (.+)$"
-    
-    if (grepl(arrow_pattern, clean_text)) {
-      old_name <- sub(arrow_pattern, "\\1", clean_text)
-      new_name <- sub(arrow_pattern, "\\2", clean_text)
-      role <- sub(arrow_pattern, "\\3", clean_text)
-      
-      return(sprintf(
-        "<span class=\"strikethrough text-danger\">%s</span> → <span class=\"text-success\">%s</span> - %s",
-        old_name, new_name, role
-      ))
-    }
-    return(sprintf("<span class=\"text-warning\">%s</span>", clean_text))
-  } else if (type == "Paycode change") {
-    # Format: Name - OldRole → NewRole - all in blue with strikethrough on old role
-    paycode_pattern <- "^(.+?) - (.+?) → (.+)$"
-    
-    if (grepl(paycode_pattern, clean_text)) {
-      name <- sub(paycode_pattern, "\\1", clean_text)
-      old_role <- sub(paycode_pattern, "\\2", clean_text)
-      new_role <- sub(paycode_pattern, "\\3", clean_text)
-      
-      return(sprintf(
-        "<span class=\"text-info\">%s - <span class=\"strikethrough\">%s</span> → %s</span>",
-        name, old_role, new_role
-      ))
-    }
-    return(sprintf("<span class=\"text-info\">%s</span>", clean_text))
+  clean_text <- cli::ansi_strip(state_text)
+
+  # Return empty string as-is
+  if (clean_text == "") {
+    return("")
   }
-  
+
+  # Detect color patterns from ANSI-stripped text
+  # Green text (additions)
+  if (grepl("^.+ - .+$", clean_text)) {
+    # Check context: if it appears to be a clean addition (was empty before)
+    # We'll add color based on the context in the calling function
+    return(sprintf("<span>%s</span>", clean_text))
+  }
+
   return(clean_text)
 }
 
 # Utility: Convert 24h time to 12h format
 convert_time_12h <- function(time_str) {
   hour <- as.integer(substr(time_str, 1, 2))
-  if (hour == 0) "12am"
-  else if (hour < 12) paste0(hour, "am")
-  else if (hour == 12) "12pm"
-  else paste0(hour - 12, "pm")
+  if (hour == 0) {
+    "12am"
+  } else if (hour < 12) {
+    paste0(hour, "am")
+  } else if (hour == 12) {
+    "12pm"
+  } else {
+    paste0(hour - 12, "pm")
+  }
 }
 
 # Suppress R CMD check notes for non-standard evaluation variables
@@ -464,7 +573,8 @@ utils::globalVariables(
     "location",
     "week",
     "type",
-    "details",
+    "before",
+    "after",
     "date",
     "day",
     "start",
