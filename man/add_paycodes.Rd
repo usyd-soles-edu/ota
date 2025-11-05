@@ -28,6 +28,9 @@ This function imports staff data from sheet 2 of the Excel file referenced in
 the input dataframe's \code{file_path} attribute. The stafflist should have
 columns: Label (staff names), Phd (0 or 1), New (0 or 1).
 
+A single dot (".") in the roster is treated as a placeholder for empty roster
+positions that do not require staffing and is automatically ignored.
+
 Paycode rules applied:
 \itemize{
   \item{PhD = 1 staff:}{\itemize{

@@ -10,7 +10,9 @@ roster_biol1007(file_path)
 \item{file_path}{Path to the Excel file containing the roster data.}
 }
 \value{
-A dataframe in long format with columns: date, day, start, end, location, name, role, week, activity.
+A dataframe in long format with columns: date, day, start, end, location, name, role, week, index.
+  The index column tracks the original cell position (e.g., "Sup-1_row5") to facilitate tracking
+  roster changes like swaps, replacements, removals, and additions.
 }
 \description{
 This function handles roster processing specific to BIOL1007 unit.

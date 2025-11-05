@@ -14,27 +14,29 @@ Must have attributes \code{unit} and \code{file_path} set.}
 A list containing:
   \item{changes}{A list with elements:
     \itemize{
-      \item{additions}{Rows in latest log not in previous log (new assignments)}
-      \item{removals}{Rows in previous log not in latest log (removed assignments)}
-      \item{replacements}{Slots where a person was replaced by another}
-      \item{paycode_changes}{Rows where a person's role changed in the same slot (e.g., Tutor (repeat) → Tutor)}
+      \item{additions}{New staff in positions that were previously empty (name was NA)}
+      \item{removals}{Staff removed (names become NA) or positions left empty}
+      \item{replacements}{Same position (index) but different person}
+      \item{swaps}{Two staff members swap positions in the same lab/time slot}
+      \item{paycode_changes}{Same person, same position, but different role/paycode}
     }
   }
   \item{df}{The input dataframe}
 }
 \description{
-Detects additions, removals, and replacements between the two latest
+Detects additions, removals, swaps, and replacements between the two latest
 roster log files for a given unit. This function reads the previous and
 latest snapshots and compares them to identify what has changed.
 }
 \details{
-Both the latest and previous log files are processed with 
-\code{\link{mutate_tutor_roles}()} before comparison to ensure consistent
-tutor role labeling.
+The `index` column (e.g., "Sup-1_row5") tracks the original cell position
+before the pivot, allowing easy detection of what happened at each position.
 
-Replacements are detected by matching on common columns (date, day, start, 
-end, location, role, week) where different names appear between versions.
-These are then removed from the additions and removals lists.
+
+Change detection is now simplified by leveraging the `index` column which
+uniquely identifies each roster cell position. Both the latest and previous
+log files are processed with \code{\link{mutate_tutor_roles}()} before
+comparison to ensure consistent tutor role labeling.
 
 This function is typically followed by \code{\link{summary}()} to display
 the detected changes in a formatted table or HTML report.

@@ -44,6 +44,8 @@
 #' }
 #'
 #' @importFrom dplyr left_join anti_join select mutate filter
+#' @importFrom readxl read_excel
+#' @importFrom tidyr replace_na
 #' @keywords internal
 #' @export
 #' @importFrom rlang .data
@@ -69,6 +71,48 @@ compare <- function(df) {
   # Apply tutor role mutation to both versions for consistent comparison
   latest_mutated <- mutate_tutor_roles(latest_pair$latest)
   previous_mutated <- mutate_tutor_roles(latest_pair$previous)
+
+  # Recalculate paycodes after role mutation to ensure consistency
+  # Read stafflist from the Excel file
+  stafflist <- suppressMessages(
+    readxl::read_excel(file_path, sheet = 2)
+  ) %>%
+    dplyr::filter(!is.na(Label), Label != "", Label != ".") %>%
+    dplyr::select(Label, Phd) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate(Phd = tidyr::replace_na(Phd, 0))
+
+  # Recalculate paycodes for latest mutated dataframe
+  latest_mutated <- latest_mutated %>%
+    dplyr::left_join(stafflist, by = c("name" = "Label")) %>%
+    dplyr::mutate(
+      paycode = dplyr::case_when(
+        Phd == 1 & role == "Tutor" ~ "TU1",
+        Phd == 1 & role == "Tutor (repeat)" ~ "TU3",
+        Phd == 1 & role == "Demonstrator" ~ "DE1",
+        Phd == 0 & role == "Tutor" ~ "TU2",
+        Phd == 0 & role == "Tutor (repeat)" ~ "TU4",
+        Phd == 0 & role == "Demonstrator" ~ "DE2",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    dplyr::select(-Phd)
+
+  # Recalculate paycodes for previous mutated dataframe
+  previous_mutated <- previous_mutated %>%
+    dplyr::left_join(stafflist, by = c("name" = "Label")) %>%
+    dplyr::mutate(
+      paycode = dplyr::case_when(
+        Phd == 1 & role == "Tutor" ~ "TU1",
+        Phd == 1 & role == "Tutor (repeat)" ~ "TU3",
+        Phd == 1 & role == "Demonstrator" ~ "DE1",
+        Phd == 0 & role == "Tutor" ~ "TU2",
+        Phd == 0 & role == "Tutor (repeat)" ~ "TU4",
+        Phd == 0 & role == "Demonstrator" ~ "DE2",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    dplyr::select(-Phd)
 
   # Check if index column exists; if not, fall back to old method
   if (
@@ -345,5 +389,7 @@ utils::globalVariables(c(
   "name_prev",
   "name_latest",
   "index",
-  "n"
+  "n",
+  "Label",
+  "Phd"
 ))

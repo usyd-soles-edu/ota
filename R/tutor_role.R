@@ -20,17 +20,23 @@
 #' df_mutated <- mutate_tutor_roles(df)
 #' }
 #'
-#' @importFrom dplyr group_by mutate row_number case_when
+#' @importFrom dplyr group_by mutate row_number case_when arrange cumsum
 #' @keywords internal
 mutate_tutor_roles <- function(df) {
   df %>%
+    dplyr::arrange(date, start) %>%
     dplyr::group_by(name, week) %>%
     dplyr::mutate(
+      tutor_count = cumsum(role == "Tutor"),
       role = dplyr::case_when(
-        role == "Tutor" & dplyr::row_number() == 1 ~ "Tutor",
-        role == "Tutor" & dplyr::row_number() > 1 ~ "Tutor (repeat)",
+        role == "Tutor" & tutor_count == 1 ~ "Tutor",
+        role == "Tutor" & tutor_count > 1 ~ "Tutor (repeat)",
         TRUE ~ role
       )
     ) %>%
+    dplyr::select(-tutor_count) %>%
     dplyr::ungroup()
 }
+
+# Suppress R CMD check notes for non-standard evaluation variables
+utils::globalVariables(c("tutor_count"))

@@ -15,7 +15,7 @@
 A list with elements:
   \item{latest}{Dataframe of the most recent log file}
   \item{previous}{Dataframe of the second-most recent log file}
-  
+
   Returns \code{NULL} if fewer than 2 log files exist for the unit. This
   ensures \code{compare()} can only execute when there are two snapshots
   to compare.

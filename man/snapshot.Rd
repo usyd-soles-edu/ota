@@ -15,7 +15,9 @@ current roster differs from the latest snapshot. If \code{TRUE}, always saves
 a new snapshot regardless of changes.}
 }
 \value{
-Invisibly returns the input dataframe, allowing for function chaining.
+Invisibly returns the input dataframe with an attribute `snapshot_created`
+  (logical) indicating whether a new snapshot was created (TRUE) or skipped due to 
+  no changes (FALSE), allowing for function chaining and downstream decisions.
 }
 \description{
 Saves the current roster to a timestamped CSV file in the logs directory.
