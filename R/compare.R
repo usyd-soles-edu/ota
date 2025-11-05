@@ -178,10 +178,19 @@ compare <- function(df) {
             r1$week == r2$week
         ) {
           # This is a swap!
+          # Create a record that captures the swap correctly:
+          # r1$name_removed (Anita) had r1$role_removed (Demonstrator)
+          # r2$name_removed (Shahnoosh) had r2$role_removed (Tutor)
+          # After swap:
+          # r1$name_removed (Anita) has r2$role_removed (Tutor)
+          # r2$name_removed (Shahnoosh) has r1$role_removed (Demonstrator)
+          swap_record <- r1
+          swap_record$role_added <- r2$role_removed # Anita's new role is Shahnoosh's old role
+
           if (is.null(swaps)) {
-            swaps <- r1
+            swaps <- swap_record
           } else {
-            swaps <- dplyr::bind_rows(swaps, r1)
+            swaps <- dplyr::bind_rows(swaps, swap_record)
           }
           replaced_indices <- c(replaced_indices, i, j)
         }
