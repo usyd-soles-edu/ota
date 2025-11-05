@@ -489,8 +489,8 @@ generate_html_summary <- function(
       start_conv,
       end_conv
     )
-    before_html <- format_state_html(row$before)
-    after_html <- format_state_html(row$after)
+    before_html <- format_state_html(row$before, row$type, "before")
+    after_html <- format_state_html(row$after, row$type, "after")
 
     table_rows <- c(
       table_rows,
@@ -533,7 +533,7 @@ generate_html_summary <- function(
 }
 
 # Helper function to format state text with HTML styling (for before/after)
-format_state_html <- function(state_text) {
+format_state_html <- function(state_text, type, column) {
   # Strip ANSI codes first
   clean_text <- cli::ansi_strip(state_text)
 
@@ -542,15 +542,19 @@ format_state_html <- function(state_text) {
     return("")
   }
 
-  # Detect color patterns from ANSI-stripped text
-  # Green text (additions)
-  if (grepl("^.+ - .+$", clean_text)) {
-    # Check context: if it appears to be a clean addition (was empty before)
-    # We'll add color based on the context in the calling function
-    return(sprintf("<span>%s</span>", clean_text))
+  # Apply colors based on type and column
+  if (type == "Swap") {
+    css_class <- "text-info" # blue
+  } else {
+    if (column == "before") {
+      css_class <- "text-danger" # red
+    } else {
+      # after
+      css_class <- "text-success" # green
+    }
   }
 
-  return(clean_text)
+  return(sprintf("<span class=\"%s\">%s</span>", css_class, clean_text))
 }
 
 # Utility: Convert 24h time to 12h format
